@@ -1093,7 +1093,383 @@ class ApiClient {
             method: 'DELETE',
         });
     }
+
+    // ============== HYBRID LEARNING MODULE ==============
+
+    // Courses
+    async getCourses(department?: string, semester?: number) {
+        const params = new URLSearchParams();
+        if (department) params.append('department', department);
+        if (semester) params.append('semester', semester.toString());
+        return this.request(`/courses?${params.toString()}`);
+    }
+
+    async getCourse(courseId: number) {
+        return this.request(`/courses/${courseId}`);
+    }
+
+    async getMyCourses() {
+        return this.request('/courses/my/enrolled');
+    }
+
+    async createCourse(data: { code: string; name: string; description?: string; department?: string; semester?: number; credits?: number }) {
+        return this.request('/courses', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async enrollStudents(courseId: number, studentIds: number[], academicYear?: string) {
+        return this.request(`/courses/${courseId}/enroll`, {
+            method: 'POST',
+            body: JSON.stringify({ student_ids: studentIds, academic_year: academicYear }),
+        });
+    }
+
+    async getEnrollableStudents(department?: string) {
+        const params = new URLSearchParams();
+        if (department) params.append('department', department);
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return this.request(`/courses/enrollable/students${query}`);
+    }
+
+    // Study Circles
+    async getMyStudyCircles() {
+        return this.request('/study-circles');
+    }
+
+    async getStudyCircle(circleId: number) {
+        return this.request(`/study-circles/${circleId}`);
+    }
+
+    async createStudyCircle(data: { name: string; description?: string; course_id?: number; subject_code?: string; has_voice_room?: boolean }) {
+        return this.request('/study-circles', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async autoEnrollCircles() {
+        return this.request('/study-circles/auto-enroll', { method: 'POST' });
+    }
+
+    async getCircleChannels(circleId: number) {
+        return this.request(`/study-circles/${circleId}/channels`);
+    }
+
+    async getChannelMessages(circleId: number, channelId: number, limit: number = 50, beforeId?: number) {
+        const params = new URLSearchParams({ limit: limit.toString() });
+        if (beforeId) params.append('before_id', beforeId.toString());
+        return this.request(`/study-circles/${circleId}/channels/${channelId}/messages?${params.toString()}`);
+    }
+
+    async postMessage(circleId: number, channelId: number, content: string, parentId?: number) {
+        return this.request(`/study-circles/${circleId}/channels/${channelId}/messages`, {
+            method: 'POST',
+            body: JSON.stringify({ content, parent_id: parentId }),
+        });
+    }
+
+    async pinMessage(circleId: number, messageId: number) {
+        return this.request(`/study-circles/${circleId}/messages/${messageId}/pin`, { method: 'POST' });
+    }
+
+    async deleteMessage(circleId: number, messageId: number) {
+        return this.request(`/study-circles/${circleId}/messages/${messageId}`, { method: 'DELETE' });
+    }
+
+    async getCircleMembers(circleId: number) {
+        return this.request(`/study-circles/${circleId}/members`);
+    }
+
+    async searchCircleMessages(circleId: number, query: string) {
+        return this.request(`/study-circles/${circleId}/search?q=${encodeURIComponent(query)}`);
+    }
+
+    // Flashcard Battles
+    async getFlashcardSets(courseId?: number, topic?: string) {
+        const params = new URLSearchParams();
+        if (courseId) params.append('course_id', courseId.toString());
+        if (topic) params.append('topic', topic);
+        return this.request(`/flashcards/sets?${params.toString()}`);
+    }
+
+    async getFlashcardSet(setId: number) {
+        return this.request(`/flashcards/sets/${setId}`);
+    }
+
+    async getFlashcards(setId: number) {
+        return this.request(`/flashcards/sets/${setId}/cards`);
+    }
+
+    async createFlashcardSet(data: { title: string; description?: string; course_id?: number; subject_code?: string; topic?: string }) {
+        return this.request('/flashcards/sets', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async addFlashcard(setId: number, data: { question: string; answer: string; hint?: string; options?: string[]; correct_option?: number; difficulty?: number }) {
+        return this.request(`/flashcards/sets/${setId}/cards`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async createBattle(setId: number, battleType: string = 'PUBLIC', numQuestions: number = 10) {
+        return this.request('/flashcards/battles', {
+            method: 'POST',
+            body: JSON.stringify({ set_id: setId, battle_type: battleType, num_questions: numQuestions }),
+        });
+    }
+
+    async findRandomBattle(setId?: number) {
+        const params = setId ? `?set_id=${setId}` : '';
+        return this.request(`/flashcards/battles/find-random${params}`);
+    }
+
+    async joinBattle(battleId: number) {
+        return this.request(`/flashcards/battles/${battleId}/join`, { method: 'POST' });
+    }
+
+    async startBattle(battleId: number) {
+        return this.request(`/flashcards/battles/${battleId}/start`, { method: 'POST' });
+    }
+
+    async getBattle(battleId: number) {
+        return this.request(`/flashcards/battles/${battleId}`);
+    }
+
+    async getBattleQuestion(battleId: number, index: number) {
+        return this.request(`/flashcards/battles/${battleId}/question/${index}`);
+    }
+
+    async submitBattleAnswer(battleId: number, questionIndex: number, answer: number, timeMs: number) {
+        return this.request(`/flashcards/battles/${battleId}/answer`, {
+            method: 'POST',
+            body: JSON.stringify({ question_index: questionIndex, answer, time_ms: timeMs }),
+        });
+    }
+
+    async endBattle(battleId: number) {
+        return this.request(`/flashcards/battles/${battleId}/end`, { method: 'POST' });
+    }
+
+    async getFlashcardLeaderboard(period: string = 'WEEKLY') {
+        return this.request(`/flashcards/leaderboard?period=${period}`);
+    }
+
+    async getMyFlashcardStats() {
+        return this.request('/flashcards/my-stats');
+    }
+
+    // Doubt Sessions
+    async getUpcomingDoubtSessions(courseId?: number) {
+        const params = courseId ? `?course_id=${courseId}` : '';
+        return this.request(`/doubt-sessions/upcoming${params}`);
+    }
+
+    async getLiveDoubtSessions() {
+        return this.request('/doubt-sessions/live');
+    }
+
+    async getAllDoubtSessions(includeEnded: boolean = false) {
+        return this.request(`/doubt-sessions?include_ended=${includeEnded}`);
+    }
+
+    async getMyDoubtSessions(includePast: boolean = false) {
+        return this.request(`/doubt-sessions/my-sessions?include_past=${includePast}`);
+    }
+
+    async getDoubtSession(sessionId: number) {
+        return this.request(`/doubt-sessions/${sessionId}`);
+    }
+
+    async createDoubtSession(data: { title: string; description?: string; course_id?: number; scheduled_at: string; duration_minutes?: number }) {
+        return this.request('/doubt-sessions', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async joinDoubtSession(sessionId: number) {
+        return this.request(`/doubt-sessions/${sessionId}/join`, { method: 'POST' });
+    }
+
+    async leaveDoubtSession(sessionId: number) {
+        return this.request(`/doubt-sessions/${sessionId}/leave`, { method: 'POST' });
+    }
+
+    async askQuestion(sessionId: number, questionText: string) {
+        return this.request(`/doubt-sessions/${sessionId}/questions`, {
+            method: 'POST',
+            body: JSON.stringify({ question_text: questionText }),
+        });
+    }
+
+    async startDoubtSession(sessionId: number) {
+        return this.request(`/doubt-sessions/${sessionId}/start`, { method: 'POST' });
+    }
+
+    async endDoubtSession(sessionId: number) {
+        return this.request(`/doubt-sessions/${sessionId}/end`, { method: 'POST' });
+    }
+
+    async updateDoubtSession(sessionId: number, data: { title?: string; description?: string; course_id?: number; scheduled_at?: string; duration_minutes?: number }) {
+        return this.request(`/doubt-sessions/${sessionId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async deleteDoubtSession(sessionId: number) {
+        return this.request(`/doubt-sessions/${sessionId}`, { method: 'DELETE' });
+    }
+
+    async getSessionSummary(sessionId: number) {
+        return this.request(`/doubt-sessions/${sessionId}/summary`);
+    }
+
+    // Collaborative Whiteboard
+    async getActiveWhiteboards(courseId?: number) {
+        const params = courseId ? `?course_id=${courseId}` : '';
+        return this.request(`/whiteboard/active${params}`);
+    }
+
+    async getClosedWhiteboards(courseId?: number, topic?: string) {
+        const params = new URLSearchParams();
+        if (courseId) params.append('course_id', courseId.toString());
+        if (topic) params.append('topic', topic);
+        return this.request(`/whiteboard/closed?${params.toString()}`);
+    }
+
+    async getWhiteboard(sessionId: number) {
+        return this.request(`/whiteboard/${sessionId}`);
+    }
+
+    async getWhiteboardCanvas(sessionId: number) {
+        return this.request(`/whiteboard/${sessionId}/canvas`);
+    }
+
+    async createWhiteboard(data: { title: string; description?: string; course_id?: number; topic?: string; enable_voice?: boolean }) {
+        return this.request('/whiteboard', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async inviteToWhiteboard(sessionId: number, userId: number, permission: string = 'DRAW') {
+        return this.request(`/whiteboard/${sessionId}/invite`, {
+            method: 'POST',
+            body: JSON.stringify({ user_id: userId, permission }),
+        });
+    }
+
+    async saveWhiteboardSnapshot(sessionId: number, canvasData: object, name?: string) {
+        return this.request(`/whiteboard/${sessionId}/snapshots`, {
+            method: 'POST',
+            body: JSON.stringify({ canvas_data: canvasData, name }),
+        });
+    }
+
+    async getWhiteboardSnapshots(sessionId: number) {
+        return this.request(`/whiteboard/${sessionId}/snapshots`);
+    }
+
+    async closeWhiteboard(sessionId: number, finalCanvas?: object) {
+        return this.request(`/whiteboard/${sessionId}/close`, {
+            method: 'POST',
+            body: JSON.stringify({ final_canvas: finalCanvas }),
+        });
+    }
+
+    // Course Reviews
+    async getCurrentReviewWindow() {
+        return this.request('/course-reviews/windows/current');
+    }
+
+    async submitCourseReview(data: { course_id: number; difficulty_rating: number; clarity_rating: number; relevance_rating: number; overall_rating: number; feedback_text?: string }) {
+        return this.request('/course-reviews', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async getMyCourseReviews() {
+        return this.request('/course-reviews/my-reviews');
+    }
+
+    async checkCourseReviewed(courseId: number) {
+        return this.request(`/course-reviews/check/${courseId}`);
+    }
+
+    async getCourseAggregates(minReviews: number = 0) {
+        return this.request(`/course-reviews/aggregates?min_reviews=${minReviews}`);
+    }
+
+    async getCourseAggregate(courseId: number) {
+        return this.request(`/course-reviews/aggregates/${courseId}`);
+    }
+
+    // Knowledge Graph
+    async getKnowledgeTopics(courseId?: number, subjectCode?: string) {
+        const params = new URLSearchParams();
+        if (courseId) params.append('course_id', courseId.toString());
+        if (subjectCode) params.append('subject_code', subjectCode);
+        return this.request(`/knowledge-graph/topics?${params.toString()}`);
+    }
+
+    async createKnowledgeTopic(data: { name: string; description?: string; subject_code?: string; course_id?: number; difficulty?: number; estimated_hours?: number; prerequisites?: number[] }) {
+        return this.request('/knowledge-graph/topics', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async searchKnowledgeTopics(query: string) {
+        return this.request(`/knowledge-graph/topics/search?q=${encodeURIComponent(query)}`);
+    }
+
+    async getKnowledgeTopic(topicId: number) {
+        return this.request(`/knowledge-graph/topics/${topicId}`);
+    }
+
+    async getTopicPrerequisites(topicId: number) {
+        return this.request(`/knowledge-graph/topics/${topicId}/prerequisites`);
+    }
+
+    async getMyKnowledgeGraph(courseId?: number, subjectCode?: string) {
+        const params = new URLSearchParams();
+        if (courseId) params.append('course_id', courseId.toString());
+        if (subjectCode) params.append('subject_code', subjectCode);
+        return this.request(`/knowledge-graph/my-graph?${params.toString()}`);
+    }
+
+    async updateTopicProgress(topicId: number, data: { status?: string; progress_percent?: number; confidence_score?: number; time_spent_minutes?: number }) {
+        return this.request(`/knowledge-graph/my-progress/${topicId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async getMyWeakAreas(threshold: number = 50) {
+        return this.request(`/knowledge-graph/my-weak-areas?threshold=${threshold}`);
+    }
+
+    async getSuggestedTopics(limit: number = 5) {
+        return this.request(`/knowledge-graph/suggested-next?limit=${limit}`);
+    }
+
+    async getLearningPaths(department?: string) {
+        const params = department ? `?department=${department}` : '';
+        return this.request(`/knowledge-graph/paths${params}`);
+    }
+
+    async getLearningPath(pathId: number) {
+        return this.request(`/knowledge-graph/paths/${pathId}`);
+    }
 }
+
 
 export const api = new ApiClient();
 

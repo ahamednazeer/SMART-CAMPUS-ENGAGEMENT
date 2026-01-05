@@ -19,7 +19,8 @@ import {
     Lightning,
     Sparkle,
     Pulse,
-    ChartLineUp
+    ChartLineUp,
+    Books
 } from '@phosphor-icons/react';
 
 interface FacultySettings {
@@ -185,7 +186,7 @@ export default function StaffDashboard() {
                         {settings?.last_seen_building?.name || 'OFF-CAMPUS'}
                     </p>
                     <p className="text-[11px] text-slate-500 mt-2 font-mono uppercase">
-                        Updated {formatTimeAgo(settings?.last_seen_at)}
+                        Updated {formatTimeAgo(settings?.last_seen_at ?? null)}
                     </p>
                 </div>
 
@@ -260,6 +261,27 @@ export default function StaffDashboard() {
                             <ArrowRight size={22} className="text-slate-600 group-hover:text-green-400 group-hover:translate-x-1 transition-all" />
                         </div>
                     </button>
+
+                    {/* Learning Management Action */}
+                    <Link
+                        href="/dashboard/staff/learning"
+                        className="block bg-slate-800/40 border border-slate-700/60 rounded-xl p-5 hover:border-purple-500/50 hover:bg-slate-800/60 transition-all duration-300 group md:col-span-2"
+                    >
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-purple-950/60 rounded-xl group-hover:bg-purple-900/60 transition-colors">
+                                    <Books size={28} weight="duotone" className="text-purple-400" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-100 group-hover:text-purple-400 transition-colors text-lg">
+                                        Learning Management
+                                    </h3>
+                                    <p className="text-sm text-slate-500 mt-0.5">Manage courses, flashcards, doubt sessions & knowledge topics</p>
+                                </div>
+                            </div>
+                            <ArrowRight size={22} className="text-slate-600 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
+                        </div>
+                    </Link>
                 </div>
             </div>
 

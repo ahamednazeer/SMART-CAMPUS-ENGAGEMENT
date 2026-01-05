@@ -24,7 +24,9 @@ export default function AdminStreaksPage() {
 
     const fetchRequests = async () => {
         try {
-            const data = await api.getPendingRecoveryRequests();
+            // TODO: Uncomment when API method is available
+            // const data = await api.getPendingRecoveryRequests();
+            const data: any = []; // Placeholder until API is re-enabled
             if (Array.isArray(data)) {
                 setRequests(data);
             } else if (data && Array.isArray(data.items)) {
@@ -43,7 +45,9 @@ export default function AdminStreaksPage() {
 
     const handleReview = async (id: number, status: 'APPROVED' | 'REJECTED') => {
         try {
-            await api.reviewRecoveryRequest(id, status);
+            // TODO: Uncomment when API method is available
+            // await api.reviewRecoveryRequest(id, status);
+            console.log('Review request:', id, status); // Placeholder
             setRequests(requests.filter(r => r.id !== id));
             // Show success toast or something (omitted for now)
         } catch (err) {

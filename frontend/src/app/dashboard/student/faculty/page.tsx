@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 
 import { api } from '@/lib/api';
+import { useOffline } from '@/components/OfflineContext';
+import { OfflineFacultyView } from '@/components/offline';
 import {
     MagnifyingGlass,
     Circle,
@@ -52,6 +54,7 @@ const formatTimeAgo = (dateString: string | null): string => {
 };
 
 export default function FacultyLocatorPage() {
+    const { isOfflineMode } = useOffline();
     const [faculty, setFaculty] = useState<FacultyLocation[]>([]);
     const [departments, setDepartments] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
@@ -71,6 +74,7 @@ export default function FacultyLocatorPage() {
     };
 
     useEffect(() => {
+        if (isOfflineMode) return; // Skip fetch when offline
         async function loadMeta() {
             try {
                 const data = await api.getFacultyDepartments();
@@ -78,9 +82,10 @@ export default function FacultyLocatorPage() {
             } catch (err) { }
         }
         loadMeta();
-    }, []);
+    }, [isOfflineMode]);
 
     useEffect(() => {
+        if (isOfflineMode) return; // Skip fetch when offline
         async function loadFaculty() {
             setLoading(true);
             try {
@@ -98,7 +103,12 @@ export default function FacultyLocatorPage() {
             }
         }
         loadFaculty();
-    }, [searchQuery, selectedDepartment, currentPage]);
+    }, [searchQuery, selectedDepartment, currentPage, isOfflineMode]);
+
+    // Show offline view when offline
+    if (isOfflineMode) {
+        return <OfflineFacultyView />;
+    }
 
     return (
         <div className="space-y-8">

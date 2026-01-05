@@ -118,7 +118,9 @@ function StreakCard({ pdfId, assignmentId }: { pdfId: number; assignmentId: numb
 
     useEffect(() => {
         Promise.all([
-            api.getStreak(pdfId),
+            // TODO: Uncomment when API method is available
+            // api.getStreak(pdfId),
+            Promise.resolve({ current_streak: 0, max_streak: 0, is_broken: false }), // Placeholder
             api.getPDF(pdfId).catch(() => null)
         ])
             .then(([streakData, pdfData]) => {

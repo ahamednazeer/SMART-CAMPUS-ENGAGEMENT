@@ -23,6 +23,34 @@ from app.models.faculty_location import (
     AvailabilityStatus, VisibilityLevel
 )
 
+# Hybrid Learning Module - New Models
+from app.models.course import Course, CourseEnrollment, CourseSemester
+from app.models.study_circle import (
+    StudyCircle, CircleChannel, CircleMember, CircleMessage,
+    ChannelType, MemberRole
+)
+from app.models.doubt_session import (
+    DoubtSession, SessionParticipant, SessionQuestion, SessionSummary,
+    SessionStatus, QuestionStatus
+)
+from app.models.whiteboard import (
+    WhiteboardSession, WhiteboardParticipant, WhiteboardSnapshot,
+    WhiteboardStatus, WhiteboardPermission
+)
+from app.models.flashcard import (
+    FlashcardSet, Flashcard, FlashcardBattle, BattleParticipant, FlashcardLeaderboard,
+    BattleType, BattleStatus
+)
+from app.models.course_review import (
+    CourseReview, CourseReviewAggregate, ReviewWindow,
+    ReviewStatus
+)
+from app.models.knowledge_graph import (
+    KnowledgeTopic, TopicDependency, StudentTopicProgress,
+    LearningPath, LearningPathTopic,
+    DependencyStrength, ProgressStatus
+)
+
 __all__ = [
     # User
     "User",
@@ -87,5 +115,49 @@ __all__ = [
     "FacultyAvailability",
     "AvailabilityStatus",
     "VisibilityLevel",
+    # Course
+    "Course",
+    "CourseEnrollment",
+    "CourseSemester",
+    # Study Circle
+    "StudyCircle",
+    "CircleChannel",
+    "CircleMember",
+    "CircleMessage",
+    "ChannelType",
+    "MemberRole",
+    # Doubt Session
+    "DoubtSession",
+    "SessionParticipant",
+    "SessionQuestion",
+    "SessionSummary",
+    "SessionStatus",
+    "QuestionStatus",
+    # Whiteboard
+    "WhiteboardSession",
+    "WhiteboardParticipant",
+    "WhiteboardSnapshot",
+    "WhiteboardStatus",
+    "WhiteboardPermission",
+    # Flashcard
+    "FlashcardSet",
+    "Flashcard",
+    "FlashcardBattle",
+    "BattleParticipant",
+    "FlashcardLeaderboard",
+    "BattleType",
+    "BattleStatus",
+    # Course Review
+    "CourseReview",
+    "CourseReviewAggregate",
+    "ReviewWindow",
+    "ReviewStatus",
+    # Knowledge Graph
+    "KnowledgeTopic",
+    "TopicDependency",
+    "StudentTopicProgress",
+    "LearningPath",
+    "LearningPathTopic",
+    "DependencyStrength",
+    "ProgressStatus",
 ]
-

@@ -3,6 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { useOffline } from '@/components/OfflineContext';
+import { OfflineActionBlocked, OfflineIndicator } from '@/components/OfflineBanner';
+import { OfflineOutpassView } from '@/components/offline';
 import {
     Buildings,
     DoorOpen,
@@ -22,7 +25,8 @@ import {
     DownloadSimple,
     FileText,
     Pulse,
-    Sparkle
+    Sparkle,
+    WifiSlash
 } from '@phosphor-icons/react';
 
 interface HostelInfo {
@@ -118,6 +122,7 @@ const formatDateTime = (dateStr: string) => {
 };
 
 export default function StudentHostelPage() {
+    const { isOfflineMode, offlineData } = useOffline();
     const [hostelInfo, setHostelInfo] = useState<HostelInfo | null>(null);
     const [summary, setSummary] = useState<OutpassSummary | null>(null);
     const [outpasses, setOutpasses] = useState<Outpass[]>([]);
@@ -350,8 +355,8 @@ export default function StudentHostelPage() {
                 </div>
             )}
 
-            {/* Apply Outpass Button */}
-            {!showForm && (
+            {/* Apply Outpass Button - disabled when offline */}
+            {!showForm && !isOfflineMode && (
                 <button
                     onClick={() => setShowForm(true)}
                     className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white py-3 px-4 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all"
@@ -359,6 +364,14 @@ export default function StudentHostelPage() {
                     <Plus size={20} weight="bold" />
                     Apply for Outpass
                 </button>
+            )}
+
+            {/* Offline warning for outpass application */}
+            {!showForm && isOfflineMode && (
+                <div className="bg-amber-900/20 border border-amber-700/40 rounded-xl px-4 py-3 text-amber-400 text-sm flex items-center gap-3">
+                    <WifiSlash size={20} />
+                    <span>Outpass applications require an internet connection</span>
+                </div>
             )}
 
             {/* Outpass Form */}

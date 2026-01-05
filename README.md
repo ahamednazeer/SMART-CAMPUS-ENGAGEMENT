@@ -18,106 +18,101 @@ Before you begin, ensure you have the following installed:
 
 ---
 
-## 1. Setup Local LLM (Ollama)
-The system uses LLMs for quiz generation and query categorization. 
+## 1. Prerequisites
+Before you begin, ensure you have the following installed:
+- [Node.js](https://nodejs.org/) (v18+)
+- [Python](https://www.python.org/) (3.11+)
+- [PostgreSQL](https://www.postgresql.org/)
+- [Ollama](https://ollama.com/) (Optional: for local AI features)
 
-1. **Install Ollama**: Download and install from [ollama.com](https://ollama.com/).
+---
+
+## 2. AI Setup (Groq or Ollama)
+The system requires an LLM for AI quizzes, assistant, and categorization. You can use either **Groq (Cloud)** or **Ollama (Local)**.
+
+### Option A: Groq Cloud (Recommended)
+1. Sign up/login at [Groq Console](https://console.groq.com/).
+2. Generate an API Key.
+3. You will add this key to your backend `.env` file later.
+
+### Option B: Ollama (Local)
+1. **Install Ollama**: Download from [ollama.com](https://ollama.com/).
 2. **Pull the Model**:
    ```bash
    ollama pull llama3.2
    ```
-3. **Keep Ollama running** in the background while using the application.
+3. Keep Ollama running in the background.
 
 ---
 
-## 2. Database Setup (PostgreSQL)
+## 3. Database Setup (PostgreSQL)
 1. **Create Database**:
    ```sql
    CREATE DATABASE smart_campus;
    ```
-2. **Note**: The backend will automatically create the required tables upon startup.
+2. **Note**: The system uses `asyncpg`, so ensure your connection string uses `postgresql+asyncpg://`.
 
 ---
 
-## 3. Backend Setup (FastAPI)
-1. **Navigate to backend directory**:
+## 4. Backend Setup (FastAPI)
+1. **Navigate and Setup Venv**:
    ```bash
    cd backend
-   ```
-2. **Create and activate Virtual Environment**:
-   ```bash
    python -m venv venv
    source venv/bin/activate  # Windows: venv\Scripts\activate
    ```
-3. **Install Dependencies**:
+2. **Install Dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
-4. **Environment Configuration**:
-   - Copy `.env.example` to `.env`:
-     ```bash
-     cp .env.example .env
-     ```
-   - If using **Ollama**, update these settings in `.env`:
-     ```env
-     OLLAMA_ENABLED=true
-     OLLAMA_BASE_URL=http://localhost:11434
-     OLLAMA_MODEL=llama3.2
-     ```
-   - Configure your `DATABASE_URL` in `.env`:
-     ```env
-     DATABASE_URL=postgresql+asyncpg://postgres:PASSWORD@localhost:5432/smart_campus
-     ```
-5. **Run the Server**:
+3. **Environment Configuration**:
+   - `cp .env.example .env`
+   - Edit `.env` and configure:
+     - `DATABASE_URL`: Your PostgreSQL credentials.
+     - `GROQ_API_KEY`: Your key (if using Groq).
+     - `OLLAMA_ENABLED`: Set to `true` (if using Ollama).
+4. **Run Server**:
    ```bash
    uvicorn main:app --reload --port 8000
    ```
 
 ---
 
-## 4. Frontend Setup (Next.js)
-1. **Navigate to frontend directory**:
+## 5. Frontend Setup (Next.js)
+1. **Navigate and Install**:
    ```bash
    cd frontend
-   ```
-2. **Install Dependencies**:
-   ```bash
    npm install
    ```
-3. **Environment Configuration**:
-   - Copy `.env.example` to `.env`:
-     ```bash
-     cp .env.example .env
-     ```
-   - Ensure the API URL is correct:
-     ```env
-     NEXT_PUBLIC_API_URL=http://localhost:8000
-     ```
-4. **Run the Development Server**:
+2. **Environment Configuration**:
+   - `cp .env.example .env`
+   - Ensure `NEXT_PUBLIC_API_URL` is set to `http://localhost:8000`.
+   - Ensure `NEXT_PUBLIC_WS_URL` is set to `ws://localhost:8000`.
+3. **Run Dev Server**:
    ```bash
    npm run dev
    ```
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 5. Admin Credentials
-The system initializes a default administrator account on first run:
+## 🔑 Default Credentials
+After setup, log in at [http://localhost:3000](http://localhost:3000):
+- **Role**: Admin
+- **Email**: `admin@campus.edu`
 - **Username**: `admin`
 - **Password**: `admin123`
-- **Email**: `admin@campus.edu`
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 ```text
 .
-├── backend/            # FastAPI Project
-│   ├── app/            # Source Code
-│   ├── uploads/        # PDF and Image storage
-│   └── main.py         # Entry point
-├── frontend/           # Next.js App (src-based)
-│   ├── src/app/        # App Router Pages
-│   └── src/components/ # Reusable UI Components
-└── README.md           # This file
+├── backend/            # FastAPI Source
+│   ├── app/            # Business Logic, Models, Routers
+│   ├── uploads/        # Storage for uploaded materials
+│   └── main.py         # App Entry Point
+├── frontend/           # Next.js SRC-based project
+│   ├── src/app/        # App Router (Pages)
+│   └── src/components/ # UI Components
+└── DEMO_GUIDE.md       # Feature walk-through guide
 ```

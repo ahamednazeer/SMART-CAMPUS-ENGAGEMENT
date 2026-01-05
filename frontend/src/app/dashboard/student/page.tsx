@@ -18,7 +18,8 @@ import {
     ChartLineUp,
     Lightning,
     GraduationCap,
-    Star
+    Star,
+    Brain
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 
@@ -223,6 +224,21 @@ export default function StudentDashboardPage() {
                     Quick Actions
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10">
+                    <Link
+                        href="/dashboard/student/learning"
+                        className="flex items-center justify-between p-4 bg-gradient-to-br from-purple-950/30 to-indigo-900/10 border border-purple-700/30 rounded-xl hover:border-purple-500/50 transition-all group sm:col-span-2 lg:col-span-1"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-purple-900/40 rounded-xl">
+                                <Brain size={24} weight="duotone" className="text-purple-400" />
+                            </div>
+                            <div>
+                                <span className="text-slate-200 font-bold block">Learning Hub</span>
+                                <span className="text-xs text-slate-500">Circles, Battles & More</span>
+                            </div>
+                        </div>
+                        <ArrowRight size={20} className="text-slate-600 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
+                    </Link>
                     <Link
                         href="/dashboard/student/attendance"
                         className="flex items-center justify-between p-4 bg-gradient-to-br from-blue-950/30 to-blue-900/10 border border-blue-700/30 rounded-xl hover:border-blue-500/50 transition-all group"

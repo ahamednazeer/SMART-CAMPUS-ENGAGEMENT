@@ -14,6 +14,15 @@ from app.routers.warden import router as warden_router
 from app.routers.ai_assistant import router as ai_assistant_router
 from app.routers.faculty_location import router as faculty_location_router
 
+# Hybrid Learning Module Routers
+from app.routers.courses import router as courses_router
+from app.routers.study_circles import router as study_circles_router
+from app.routers.flashcards import router as flashcards_router
+from app.routers.doubt_sessions import router as doubt_sessions_router
+from app.routers.whiteboard import router as whiteboard_router
+from app.routers.course_reviews import router as course_reviews_router
+from app.routers.knowledge_graph import router as knowledge_graph_router
+
 __all__ = [
     "auth_router",
     "users_router",
@@ -29,5 +38,12 @@ __all__ = [
     "warden_router",
     "ai_assistant_router",
     "faculty_location_router",
+    # Hybrid Learning Module
+    "courses_router",
+    "study_circles_router",
+    "flashcards_router",
+    "doubt_sessions_router",
+    "whiteboard_router",
+    "course_reviews_router",
+    "knowledge_graph_router",
 ]
-

@@ -19,6 +19,14 @@ from app.routers import (
     warden_router,
     ai_assistant_router,
     faculty_location_router,
+    # Hybrid Learning Module
+    courses_router,
+    study_circles_router,
+    flashcards_router,
+    doubt_sessions_router,
+    whiteboard_router,
+    course_reviews_router,
+    knowledge_graph_router,
 )
 from app.routers.bonafide import router as bonafide_router
 from app.routers.queries import router as queries_router
@@ -107,6 +115,20 @@ app.include_router(queries_router)
 app.include_router(complaints_router)
 app.include_router(ai_assistant_router)
 app.include_router(faculty_location_router)
+
+# Hybrid Learning Module Routers
+app.include_router(courses_router)
+app.include_router(study_circles_router)
+app.include_router(flashcards_router)
+app.include_router(doubt_sessions_router)
+app.include_router(whiteboard_router)
+app.include_router(course_reviews_router)
+app.include_router(knowledge_graph_router)
+
+# WebSocket Router for real-time features
+from app.routers.websocket import router as websocket_router
+app.include_router(websocket_router)
+
 
 # Mount static files (uploads)
 from fastapi.staticfiles import StaticFiles

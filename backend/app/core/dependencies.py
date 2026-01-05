@@ -75,3 +75,9 @@ require_student = require_roles(UserRole.STUDENT, UserRole.HOSTELLER, UserRole.D
 require_warden = require_roles(UserRole.ADMIN, UserRole.WARDEN)
 require_hosteller = require_roles(UserRole.STUDENT, UserRole.HOSTELLER)
 require_maintenance = require_roles(UserRole.ADMIN, UserRole.MAINTENANCE_STAFF)
+
+# Alias for require_roles to accept a list of roles
+def require_role(allowed_roles: list[UserRole]):
+    """Dependency factory that accepts a list of roles."""
+    return require_roles(*allowed_roles)
+

@@ -26,6 +26,8 @@ import {
 } from '@phosphor-icons/react';
 import { AIAssistantProvider } from './AIAssistantContext';
 import AIAssistant from './AIAssistant';
+import { OfflineProvider } from './OfflineContext';
+import OfflineBanner from './OfflineBanner';
 
 interface MenuItem {
     icon: React.ElementType;
@@ -398,6 +400,9 @@ export default function DashboardLayout({
             {/* AI Assistant - Only for students */}
             {isStudent && <AIAssistant />}
 
+            {/* Offline Banner - Only for students */}
+            {isStudent && <OfflineBanner />}
+
             {/* Overlay when resizing to prevent iframe capturing mouse */}
             {isResizing && (
                 <div className="fixed inset-0 z-[100] cursor-ew-resize" />
@@ -405,11 +410,13 @@ export default function DashboardLayout({
         </div>
     );
 
-    // Wrap with AI provider for students
+    // Wrap with AI provider and Offline provider for students
     if (isStudent) {
         return (
             <AIAssistantProvider>
-                {content}
+                <OfflineProvider userRole={role}>
+                    {content}
+                </OfflineProvider>
             </AIAssistantProvider>
         );
     }
