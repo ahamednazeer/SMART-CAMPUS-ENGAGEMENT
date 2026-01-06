@@ -297,7 +297,7 @@ export default function DashboardLayout({
                     <GraduationCap size={28} weight="duotone" className="text-blue-400 flex-shrink-0" />
                     {showLabels && (
                         <div className="overflow-hidden">
-                            <h1 className="font-chivo font-bold text-sm uppercase tracking-wider whitespace-nowrap">Smart Campus</h1>
+                            <h1 className="font-chivo font-bold text-sm uppercase tracking-wider whitespace-nowrap">Institution Mangement System</h1>
                             <p className="text-xs text-slate-500 font-mono">{role.replace('_', ' ')}</p>
                         </div>
                     )}

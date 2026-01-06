@@ -1,6 +1,6 @@
-# Smart Campus Engagement System - Demo Guide
+# Institution Mangement System Engagement System - Demo Guide
 
-Welcome to the **Smart Campus Engagement System**, a state-of-the-art platform designed to revolutionize campus life through AI-driven learning, seamless administration, and interactive engagement.
+Welcome to the **Institution Mangement System Engagement System**, a state-of-the-art platform designed to revolutionize campus life through AI-driven learning, seamless administration, and interactive engagement.
 
 ---
 

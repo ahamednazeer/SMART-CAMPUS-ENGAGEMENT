@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
     
     # App Settings
-    APP_NAME: str = "Smart Campus Engagement"
+    APP_NAME: str = "Institution Mangement System Engagement"
     DEBUG: bool = True
     
     # File Upload

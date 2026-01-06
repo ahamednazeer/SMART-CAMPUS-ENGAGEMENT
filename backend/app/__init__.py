@@ -1,1 +1,1 @@
-# Smart Campus Engagement System - Backend App
+# Institution Mangement System Engagement System - Backend App

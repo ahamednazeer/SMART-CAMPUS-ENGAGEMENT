@@ -1,4 +1,4 @@
-# Smart Campus Engagement System - Backend
+# Institution Mangement System Engagement System - Backend
 
 ## Tech Stack
 - Python 3.11+

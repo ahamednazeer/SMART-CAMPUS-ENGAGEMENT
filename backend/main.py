@@ -85,7 +85,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Smart Campus Engagement System API",
+    description="Institution Mangement System Engagement System API",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -145,7 +145,7 @@ app.mount("/static", StaticFiles(directory=settings.UPLOAD_DIR), name="static")
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {"message": "Smart Campus Engagement System API", "version": "1.0.0"}
+    return {"message": "Institution Mangement System Engagement System API", "version": "1.0.0"}
 
 
 @app.get("/health")

@@ -1,7 +1,7 @@
 {
-    "name": "Smart Campus",
+    "name": "Institution Mangement System",
     "short_name": "SmartCampus",
-    "description": "Smart Campus Engagement Platform - Student Portal",
+    "description": "Institution Mangement System Engagement Platform - Student Portal",
     "theme_color": "#0f172a",
     "background_color": "#0f172a",
     "display": "standalone",

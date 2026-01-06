@@ -284,7 +284,7 @@ export default function OutpassViewPage() {
                         <div className="flex items-center justify-center gap-2 mb-1">
                             <Buildings size={20} className="text-white/80" />
                             <span className="text-white/80 text-xs font-semibold uppercase tracking-widest">
-                                Smart Campus
+                                Institution Mangement System
                             </span>
                         </div>
                         <h1 className="text-white font-bold text-lg uppercase tracking-wide">

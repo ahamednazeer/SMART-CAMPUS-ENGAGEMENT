@@ -1,5 +1,5 @@
 """
-AI Assistant Service - Smart Campus AI Companion.
+AI Assistant Service - Institution Mangement System AI Companion.
 
 Design Philosophy:
 - Read-Only Intelligence: Can read allowed data, never write or modify
@@ -114,10 +114,10 @@ class AIAssistantService:
     }
     
     # System prompt for AI behavior
-    SYSTEM_PROMPT = """You are the Smart Campus AI Assistant - a friendly, knowledgeable guide for students at this educational institution.
+    SYSTEM_PROMPT = """You are the Institution Mangement System AI Assistant - a friendly, knowledgeable guide for students at this educational institution.
 
 YOUR IDENTITY:
-- You are "Campus AI" - the official AI assistant for this Smart Campus platform
+- You are "Campus AI" - the official AI assistant for this Institution Mangement System platform
 - You help students navigate their campus life, understand rules, and get answers quickly
 - You have access to THIS student's personal data (attendance, queries, complaints, etc.)
 - You're available 24/7 to answer questions when staff might not be
@@ -543,7 +543,7 @@ What can I assist you with today?" """
     async def extract_pdf_reference(cls, message: str, user: User, db: AsyncSession) -> tuple[int | None, str | None]:
         """
         Check if message references a specific PDF and return its ID and content.
-        Patterns detected: "from test-1", "in PDF test-1", "from Smart Campus", etc.
+        Patterns detected: "from test-1", "in PDF test-1", "from Institution Mangement System", etc.
         """
         import re
         

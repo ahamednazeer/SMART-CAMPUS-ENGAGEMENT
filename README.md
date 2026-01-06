@@ -1,4 +1,4 @@
-# Smart Campus Engagement System
+# Institution Mangement System Engagement System
 
 A comprehensive campus management and engagement platform featuring AI-powered quiz generation, attendance tracking, query management, maintenance complaints, and more.
 
