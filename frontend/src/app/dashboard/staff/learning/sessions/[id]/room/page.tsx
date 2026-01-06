@@ -95,7 +95,7 @@ export default function SessionRoomPage() {
 
         loadJitsiScript().then(() => {
             const domain = '8x8.vc';
-            const roomName = `vpaas-magic-cookie-ef5ce88c523d41a599c8b1dc5b3ab765/SmartCampusDoubt${sessionId}`;
+            const roomName = `vpaas-magic-cookie-68b8aa6f9d0f4538953b86d65c058184/SmartCampusDoubt${sessionId}`;
 
             const options = {
                 roomName: roomName,

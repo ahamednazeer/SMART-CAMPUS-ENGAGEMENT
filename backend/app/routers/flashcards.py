@@ -11,6 +11,7 @@ from app.core.dependencies import get_current_user, require_role
 from app.models.user import User, UserRole
 from app.models.flashcard import BattleType
 from app.services.flashcard_service import FlashcardService
+from app.services.ai_service import AIFlashcardGenerator
 
 
 router = APIRouter(prefix="/flashcards", tags=["Flashcard Battles"])
@@ -95,6 +96,84 @@ class BattleResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class GenerateFlashcardsRequest(BaseModel):
+    """Request schema for AI-generated flashcards."""
+    topic: str
+    subject_code: str | None = None
+    num_cards: int = 10
+    difficulty: str = "medium"  # easy, medium, hard
+    auto_publish: bool = True
+
+
+# ============== AI Generation Endpoint ==============
+
+@router.post("/generate-from-topic")
+async def generate_flashcards_from_topic(
+    data: GenerateFlashcardsRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Generate flashcards using AI based on a topic.
+    Creates a new flashcard set with AI-generated cards.
+    """
+    try:
+        # Generate flashcards using AI
+        result = await AIFlashcardGenerator.generate_flashcards_from_topic(
+            topic=data.topic,
+            subject_code=data.subject_code,
+            num_cards=data.num_cards,
+            difficulty=data.difficulty
+        )
+        
+        # Create the flashcard set
+        service = FlashcardService(db)
+        flashcard_set = await service.create_set(
+            title=result.get("title", f"{data.topic} Flashcards"),
+            description=result.get("description", f"AI-generated flashcards for {data.topic}"),
+            created_by=current_user.id,
+            subject_code=data.subject_code,
+            topic=data.topic,
+            is_ai_generated=True
+        )
+        
+        # Add the generated cards
+        cards = result.get("cards", [])
+        if cards:
+            await service.bulk_add_cards(
+                set_id=flashcard_set.id,
+                cards=[
+                    {
+                        "question": c["question"],
+                        "answer": c["answer"],
+                        "hint": c.get("hint"),
+                        "options": c.get("options"),
+                        "correct_option": c.get("correct_option"),
+                        "difficulty": c.get("difficulty", 2)
+                    }
+                    for c in cards
+                ]
+            )
+        
+        # Auto-publish if requested
+        if data.auto_publish:
+            await service.publish_set(flashcard_set.id)
+        
+        return {
+            "message": f"Generated {len(cards)} flashcards for '{data.topic}'",
+            "set_id": flashcard_set.id,
+            "title": flashcard_set.title,
+            "cards_count": len(cards),
+            "is_published": data.auto_publish
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate flashcards: {str(e)}"
+        )
 
 
 # ============== Flashcard Set Endpoints ==============

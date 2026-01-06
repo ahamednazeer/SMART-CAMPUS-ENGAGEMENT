@@ -170,7 +170,20 @@ class CircleMessage(Base):
     
     # Relationships
     channel = relationship("CircleChannel", back_populates="messages")
+    user = relationship("User", foreign_keys=[user_id])
     replies = relationship("CircleMessage", backref="parent", remote_side=[id])
     
+    @property
+    def user_name(self) -> str:
+        if self.user:
+            return f"{self.user.first_name} {self.user.last_name}"
+        return f"User {self.user_id}"
+
+    @property
+    def user_initials(self) -> str:
+        if self.user:
+            return f"{self.user.first_name[0]}{self.user.last_name[0]}".upper()
+        return "U"
+
     def __repr__(self) -> str:
         return f"<CircleMessage id={self.id} channel={self.channel_id}>"

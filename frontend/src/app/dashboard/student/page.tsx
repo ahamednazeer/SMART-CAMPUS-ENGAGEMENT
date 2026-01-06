@@ -152,7 +152,7 @@ export default function StudentDashboardPage() {
             {/* Two Column Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Attendance Summary */}
-                <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-6 relative overflow-hidden">
+                <div data-walkthrough="attendance" className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-6 relative overflow-hidden">
                     <Sparkle size={80} weight="duotone" className="absolute -right-4 -top-4 text-slate-700/20" />
                     <h3 className="text-sm font-mono text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
                         <CalendarCheck size={16} weight="duotone" />
@@ -177,7 +177,7 @@ export default function StudentDashboardPage() {
                 </div>
 
                 {/* Recent Quiz Attempts */}
-                <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-6 relative overflow-hidden">
+                <div data-walkthrough="quizzes" className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-6 relative overflow-hidden">
                     <Sparkle size={80} weight="duotone" className="absolute -right-4 -top-4 text-slate-700/20" />
                     <h3 className="text-sm font-mono text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
                         <Trophy size={16} weight="duotone" />
@@ -217,7 +217,7 @@ export default function StudentDashboardPage() {
             </div>
 
             {/* Quick Actions */}
-            <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-6 relative overflow-hidden">
+            <div data-walkthrough="quick-actions" className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-6 relative overflow-hidden">
                 <Sparkle size={80} weight="duotone" className="absolute -right-4 -top-4 text-slate-700/20" />
                 <h3 className="text-sm font-mono text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
                     <Lightning size={16} weight="duotone" />

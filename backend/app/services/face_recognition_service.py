@@ -11,7 +11,9 @@ class FaceRecognitionService:
     """Service for face detection and recognition using DeepFace."""
     
     # Face match threshold (0-1, lower is stricter)
-    DEFAULT_THRESHOLD = 0.4  # DeepFace uses cosine distance, lower = more similar
+    # Face match threshold (0-1, lower is stricter)
+    # For ArcFace with cosine distance, 0.68 is a standard threshold
+    DEFAULT_THRESHOLD = 0.68  
     
     def __init__(self):
         self._deepface = None
@@ -90,7 +92,7 @@ class FaceRecognitionService:
             # Get face embedding using DeepFace
             embedding_objs = self.deepface.represent(
                 img_path=image_path,
-                model_name="VGG-Face",  # Changed from Facenet512 due to weights issue
+                model_name="ArcFace",
                 detector_backend="opencv",
                 enforce_detection=True
             )
@@ -139,18 +141,66 @@ class FaceRecognitionService:
             cosine_similarity = dot_product / (norm_known * norm_unknown)
             cosine_distance = 1 - cosine_similarity
             
-            # Convert distance to similarity score (0-1, higher is better)
-            similarity_score = 1 - min(cosine_distance, 1.0)
+            # Convert distance to similarity score using informed mapping
+            similarity_score = self._distance_to_similarity(cosine_distance)
             
-            # Check if match
-            is_match = cosine_distance <= threshold
+            # Check if match (using the 60% uncertainty threshold as the absolute minimum)
+            is_match = similarity_score >= 0.60
             
             return is_match, round(similarity_score, 4)
             
         except Exception as e:
             print(f"Face comparison error: {e}")
             return False, 0.0
-    
+
+    def _distance_to_similarity(self, distance: float) -> float:
+        """
+        Convert ArcFace cosine distance to similarity percentage based on user requirements.
+        Threshold (d=0.68) maps to 60% (Uncertain boundary).
+        
+        Mapping logic:
+        - 0.00 distance -> 100% (Identical)
+        - 0.30 distance -> 90%  (Strong match boundary)
+        - 0.50 distance -> 75%  (Likely same person boundary)
+        - 0.68 distance -> 60%  (Uncertain boundary / Match threshold)
+        - 1.00+ distance -> 0%  (Not a match)
+        """
+        d = min(max(distance, 0.0), 1.0)
+        
+        if d <= 0.3:
+            # Linear map 0.0..0.3 to 1.0..0.9
+            return 1.0 - (d / 0.3) * 0.1
+        elif d <= 0.5:
+            # Linear map 0.3..0.5 to 0.9..0.75
+            return 0.9 - ((d - 0.3) / (0.5 - 0.3)) * 0.15
+        elif d <= 0.68:
+            # Linear map 0.5..0.68 to 0.75..0.6
+            return 0.75 - ((d - 0.5) / (0.68 - 0.5)) * 0.15
+        else:
+            # Linear map 0.68..1.0 to 0.6..0.0
+            return 0.60 - ((d - 0.68) / (1.0 - 0.68)) * 0.60
+
+    def get_confidence_label(self, similarity_score: float) -> str:
+        """
+        Get descriptive label based on match confidence score.
+        
+        Args:
+            similarity_score: Similarity score from 0.0 to 1.0
+            
+        Returns:
+            Human-readable confidence label
+        """
+        score = similarity_score * 100
+        
+        if score >= 90:
+            return "Strong match"
+        elif score >= 75:
+            return "Likely same person"
+        elif score >= 60:
+            return "Uncertain"
+        else:
+            return "Not a match"
+
     def verify_face(
         self, 
         reference_image_path: str, 
@@ -175,21 +225,24 @@ class FaceRecognitionService:
             result = self.deepface.verify(
                 img1_path=reference_image_path,
                 img2_path=live_image_path,
-                model_name="VGG-Face",
+                model_name="ArcFace",
                 detector_backend="opencv",
                 distance_metric="cosine",
                 enforce_detection=True
             )
             
-            # DeepFace returns distance, convert to similarity
+            # DeepFace returns distance, convert to similarity using informed mapping
             distance = result.get("distance", 1.0)
-            verified = result.get("verified", False)
-            similarity_score = 1 - min(distance, 1.0)
+            similarity_score = self._distance_to_similarity(distance)
             
-            if verified:
-                return True, round(similarity_score, 4), "Face verified successfully"
-            else:
-                return False, round(similarity_score, 4), "Face mismatch detected"
+            label = self.get_confidence_label(similarity_score)
+            
+            # A "match" is anything 60% or higher
+            is_match = similarity_score >= 0.60
+            
+            message = f"{label} ({round(similarity_score * 100, 1)}%)"
+            
+            return is_match, round(similarity_score, 4), message
                 
         except ValueError as e:
             # Face not detected

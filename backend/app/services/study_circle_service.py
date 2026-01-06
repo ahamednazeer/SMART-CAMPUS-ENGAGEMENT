@@ -33,6 +33,8 @@ class StudyCircleService:
         has_voice_room: bool = False
     ) -> StudyCircle:
         """Create a new study circle with default channels."""
+        voice_room_url = self._generate_voice_room_url(name) if has_voice_room else None
+        
         circle = StudyCircle(
             name=name,
             description=description,
@@ -41,6 +43,7 @@ class StudyCircleService:
             semester=semester,
             department=department,
             has_voice_room=has_voice_room,
+            voice_room_url=voice_room_url,
             created_by=created_by
         )
         self.db.add(circle)
@@ -65,6 +68,14 @@ class StudyCircleService:
             )
             self.db.add(channel)
         
+        # Add creator as moderator member
+        creator_member = CircleMember(
+            circle_id=circle.id,
+            user_id=created_by,
+            role=MemberRole.MODERATOR
+        )
+        self.db.add(creator_member)
+        
         await self.db.flush()
         await self.db.refresh(circle)
         return circle
@@ -76,7 +87,10 @@ class StudyCircleService:
             .options(selectinload(StudyCircle.channels))
             .where(StudyCircle.id == circle_id)
         )
-        return result.scalar_one_or_none()
+        circle = result.scalar_one_or_none()
+        if circle and circle.has_voice_room and not circle.voice_room_url:
+            circle.voice_room_url = self._generate_voice_room_url(circle.name)
+        return circle
     
     async def get_circles_by_course(self, course_id: int) -> list[StudyCircle]:
         """Get all circles for a course."""
@@ -86,7 +100,11 @@ class StudyCircleService:
                 StudyCircle.is_active == True
             )
         )
-        return list(result.scalars().all())
+        circles = list(result.scalars().all())
+        for circle in circles:
+            if circle.has_voice_room and not circle.voice_room_url:
+                circle.voice_room_url = self._generate_voice_room_url(circle.name)
+        return circles
     
     async def get_student_circles(self, student_id: int) -> list[StudyCircle]:
         """Get all circles a student is a member of."""
@@ -100,7 +118,91 @@ class StudyCircleService:
             .options(selectinload(StudyCircle.channels))
             .order_by(StudyCircle.name)
         )
-        return list(result.scalars().all())
+        circles = list(result.scalars().all())
+        for circle in circles:
+            if circle.has_voice_room and not circle.voice_room_url:
+                circle.voice_room_url = self._generate_voice_room_url(circle.name)
+        return circles
+    
+    async def get_all_circles(self, active_only: bool = True) -> list[StudyCircle]:
+        """Get all study circles (Admin/Staff only)."""
+        query = select(StudyCircle)
+        if active_only:
+            query = query.where(StudyCircle.is_active == True)
+        query = query.order_by(StudyCircle.name)
+        result = await self.db.execute(query)
+        circles = list(result.scalars().all())
+        for circle in circles:
+            if circle.has_voice_room and not circle.voice_room_url:
+                circle.voice_room_url = self._generate_voice_room_url(circle.name)
+        return circles
+
+    def _generate_voice_room_url(self, name: str) -> str:
+        """Generate a Jitsi room URL with video disabled."""
+        import re
+        import hashlib
+        # Generate a stable room name based on circle name to keep it consistent
+        clean_name = re.sub(r'[^a-zA-Z0-9]', '', name)
+        # Add a hash of the name to ensure uniqueness but consistency for the same circle
+        name_hash = hashlib.md5(name.encode()).hexdigest()[:8]
+        # Use 8x8 vPaas with magic cookie
+        room_name = f"vpaas-magic-cookie-68b8aa6f9d0f4538953b86d65c058184/SC-{clean_name}-{name_hash}"
+        
+        # More aggressive skip pre-join config
+        return (
+            f"https://8x8.vc/{room_name}#"
+            "config.startWithVideoMuted=true&"
+            "config.startWithAudioMuted=true&"
+            "config.prejoinPageEnabled=false&"
+            "config.prejoinConfig.enabled=false&"
+            "config.requireDisplayName=false"
+        )
+
+    async def update_circle(
+        self,
+        circle_id: int,
+        name: str | None = None,
+        description: str | None = None,
+        course_id: int | None = None,
+        subject_code: str | None = None,
+        has_voice_room: bool | None = None,
+        is_active: bool | None = None
+    ) -> StudyCircle | None:
+        """Update a study circle."""
+        circle = await self.get_circle(circle_id)
+        if not circle:
+            return None
+        
+        if name is not None:
+            circle.name = name
+        if description is not None:
+            circle.description = description
+        if course_id is not None:
+            circle.course_id = course_id
+        if subject_code is not None:
+            circle.subject_code = subject_code
+        if has_voice_room is not None:
+            circle.has_voice_room = has_voice_room
+            if has_voice_room and not circle.voice_room_url:
+                circle.voice_room_url = self._generate_voice_room_url(circle.name)
+        if is_active is not None:
+            circle.is_active = is_active
+            
+        circle.updated_at = datetime.utcnow()
+        await self.db.commit()
+        await self.db.refresh(circle)
+        return circle
+
+    async def delete_circle(self, circle_id: int) -> bool:
+        """Soft delete a study circle."""
+        circle = await self.get_circle(circle_id)
+        if not circle:
+            return False
+        
+        circle.is_active = False
+        circle.updated_at = datetime.utcnow()
+        await self.db.commit()
+        return True
     
     async def auto_enroll_student(self, student_id: int) -> list[StudyCircle]:
         """Auto-enroll student in circles based on their course enrollments."""
@@ -309,15 +411,20 @@ class StudyCircleService:
         self.db.add(message)
         await self.db.flush()
         
-        # Update thread count on parent if reply
         if parent_id:
             parent = await self.get_message(parent_id)
             if parent:
                 parent.thread_count += 1
                 await self.db.flush()
         
-        await self.db.refresh(message)
-        return message
+        await self.db.flush()
+        # Reload with user info
+        result = await self.db.execute(
+            select(CircleMessage)
+            .options(selectinload(CircleMessage.user))
+            .where(CircleMessage.id == message.id)
+        )
+        return result.scalar_one()
     
     async def get_message(self, message_id: int) -> CircleMessage | None:
         """Get a message by ID."""
@@ -337,7 +444,7 @@ class StudyCircleService:
         parent_id: int | None = None
     ) -> list[CircleMessage]:
         """Get messages in a channel with pagination."""
-        query = select(CircleMessage).where(
+        query = select(CircleMessage).options(selectinload(CircleMessage.user)).where(
             CircleMessage.channel_id == channel_id,
             CircleMessage.is_deleted == False
         )
@@ -360,7 +467,7 @@ class StudyCircleService:
     async def get_pinned_messages(self, channel_id: int) -> list[CircleMessage]:
         """Get all pinned messages in a channel."""
         result = await self.db.execute(
-            select(CircleMessage).where(
+            select(CircleMessage).options(selectinload(CircleMessage.user)).where(
                 CircleMessage.channel_id == channel_id,
                 CircleMessage.is_pinned == True,
                 CircleMessage.is_deleted == False

@@ -40,7 +40,7 @@ class AttendanceService:
     """Service for attendance operations with location and face verification."""
     
     # Maximum attempts per day
-    MAX_DAILY_ATTEMPTS = 5
+    MAX_DAILY_ATTEMPTS = 20
     
     # Upload directories
     PROFILE_PHOTOS_DIR = "profile_photos"
@@ -506,13 +506,14 @@ class AttendanceService:
         if not is_match:
             attempt.success = False
             attempt.failure_reason = FailureReason.FACE_MISMATCH
-            attempt.failure_details = f"Face match score: {similarity_score}"
+            attempt.failure_details = message
             await self.attempt_repo.create(attempt)
             return AttendanceMarkResult(
                 success=False,
-                message="Face verification failed. Please try again.",
+                message=f"Face verification failed: {message}",
                 failure_reason=FailureReason.FACE_MISMATCH,
-                face_match_score=similarity_score
+                face_match_score=similarity_score,
+                face_match_label=message
             )
         
         # SUCCESS: All gates passed
@@ -545,9 +546,10 @@ class AttendanceService:
         
         return AttendanceMarkResult(
             success=True,
-            message="Attendance marked successfully!",
+            message=f"Attendance marked successfully! {message}",
             attendance_status=AttendanceStatus.PRESENT,
-            face_match_score=similarity_score
+            face_match_score=similarity_score,
+            face_match_label=message
         )
     
     # ============== Attendance Records ==============

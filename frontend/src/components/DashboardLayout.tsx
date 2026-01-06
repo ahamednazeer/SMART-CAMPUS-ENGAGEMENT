@@ -28,6 +28,8 @@ import { AIAssistantProvider } from './AIAssistantContext';
 import AIAssistant from './AIAssistant';
 import { OfflineProvider } from './OfflineContext';
 import OfflineBanner from './OfflineBanner';
+import { WalkthroughProvider } from './WalkthroughContext';
+import WalkthroughOverlay from './WalkthroughOverlay';
 
 interface MenuItem {
     icon: React.ElementType;
@@ -106,6 +108,8 @@ const menuItemsByRole: Record<string, MenuItem[]> = {
     STAFF: [
         { icon: Gauge, label: 'Overview', path: '/dashboard/staff' },
         { icon: MapPin, label: 'Availability', path: '/dashboard/staff/availability' },
+        { icon: Books, label: 'Learning Hub', path: '/dashboard/staff/learning' },
+        { icon: ChatCircle, label: 'Study Circles', path: '/dashboard/student/learning/circles' },
     ],
 };
 
@@ -283,6 +287,7 @@ export default function DashboardLayout({
             {/* Sidebar */}
             <aside
                 ref={sidebarRef}
+                data-walkthrough="sidebar"
                 className={`print:hidden bg-slate-900 border-r border-slate-800 h-screen sticky top-0 flex flex-col z-50 transition-all ${isResizing ? 'transition-none' : 'duration-200'
                     } ${isHidden ? 'w-0 overflow-hidden border-0' : ''}`}
                 style={{ width: isHidden ? 0 : sidebarWidth }}
@@ -347,7 +352,7 @@ export default function DashboardLayout({
             {/* Main Content */}
             <main className="flex-1 overflow-auto relative z-10">
                 {/* Header */}
-                <div className="print:hidden backdrop-blur-md bg-slate-950/80 border-b border-slate-700 sticky top-0 z-40">
+                <div data-walkthrough="header" className="print:hidden backdrop-blur-md bg-slate-950/80 border-b border-slate-700 sticky top-0 z-40">
                     <div className="flex items-center justify-between px-6 py-4">
                         <div className="flex items-center gap-4">
                             {/* Show toggle button when sidebar is hidden */}
@@ -400,6 +405,9 @@ export default function DashboardLayout({
             {/* AI Assistant - Only for students */}
             {isStudent && <AIAssistant />}
 
+            {/* Walkthrough Overlay - Only for students */}
+            {isStudent && <WalkthroughOverlay />}
+
             {/* Offline Banner - Only for students */}
             {isStudent && <OfflineBanner />}
 
@@ -410,14 +418,16 @@ export default function DashboardLayout({
         </div>
     );
 
-    // Wrap with AI provider and Offline provider for students
+    // Wrap with AI provider, Offline provider, and Walkthrough provider for students
     if (isStudent) {
         return (
-            <AIAssistantProvider>
-                <OfflineProvider userRole={role}>
-                    {content}
-                </OfflineProvider>
-            </AIAssistantProvider>
+            <WalkthroughProvider>
+                <AIAssistantProvider>
+                    <OfflineProvider userRole={role}>
+                        {content}
+                    </OfflineProvider>
+                </AIAssistantProvider>
+            </WalkthroughProvider>
         );
     }
 

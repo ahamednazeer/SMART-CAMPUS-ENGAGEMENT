@@ -116,3 +116,6 @@ After setup, log in at [http://localhost:3000](http://localhost:3000):
 │   └── src/components/ # UI Components
 └── DEMO_GUIDE.md       # Feature walk-through guide
 ```
+
+From: https://github.com/serengil/deepface_models/releases/download/v1.0/vgg_face_weights.h5
+

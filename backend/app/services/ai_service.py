@@ -797,3 +797,157 @@ Keep it professional and concise. Do not include greetings or signatures."""
         
         return f"{category} issue has been addressed and resolved {staff_info}."
 
+
+class AIFlashcardGenerator:
+    """AI-powered flashcard generation from topics."""
+    
+    @classmethod
+    async def generate_flashcards_from_topic(
+        cls,
+        topic: str,
+        subject_code: str | None = None,
+        num_cards: int = 10,
+        difficulty: str = "medium"
+    ) -> dict:
+        """
+        Generate flashcard Q&A pairs using AI based on a topic.
+        
+        Args:
+            topic: The topic to generate flashcards for
+            subject_code: Optional subject code for context
+            num_cards: Number of flashcards to generate (default 10)
+            difficulty: "easy", "medium", or "hard"
+        
+        Returns:
+            Dictionary with title, description, and list of flashcard dicts
+        """
+        api_url, headers, model = AIQuizService._get_api_config()
+        
+        subject_context = f"for the subject {subject_code}" if subject_code else ""
+        
+        prompt = f"""Generate exactly {num_cards} educational flashcards about: {topic} {subject_context}
+
+DIFFICULTY LEVEL: {difficulty}
+- easy: Basic facts, definitions, simple concepts
+- medium: Understanding concepts, explaining relationships
+- hard: Analysis, application, complex ideas
+
+REQUIREMENTS:
+1. Each flashcard has a QUESTION and an ANSWER
+2. Questions should be clear and specific
+3. Answers should be concise but complete (1-3 sentences)
+4. Include 4 multiple choice OPTIONS with the CORRECT_OPTION index (0-3)
+5. Include a HINT for each question
+6. Cover different aspects of the topic
+7. Progress from foundational to more advanced concepts
+
+=== OUTPUT FORMAT ===
+Return ONLY valid JSON (no markdown, no explanation):
+{{
+    "title": "{topic} Flashcards",
+    "description": "AI-generated flashcards covering {topic}",
+    "cards": [
+        {{
+            "question": "Clear question about the topic?",
+            "answer": "Concise explanatory answer.",
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "correct_option": 0,
+            "hint": "Helpful hint for the question",
+            "difficulty": 1
+        }}
+    ]
+}}
+
+CRITICAL: 
+- Generate exactly {num_cards} flashcards
+- Each card MUST have question, answer, options (4), correct_option (0-3), hint, and difficulty (1-5)
+- difficulty number: 1=easy, 2-3=medium, 4-5=hard"""
+
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are an expert educator creating flashcards for students. Generate accurate, educational content. Output ONLY valid JSON."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "temperature": 0.8,
+            "max_tokens": 4000
+        }
+        
+        max_retries = 3
+        last_error = None
+        provider_name = "Ollama" if settings.OLLAMA_ENABLED else "GROQ"
+        
+        for attempt in range(max_retries):
+            try:
+                timeout = 180.0 if settings.OLLAMA_ENABLED else 90.0
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    response = await client.post(
+                        api_url,
+                        headers=headers,
+                        json=payload
+                    )
+                    
+                    if response.status_code != 200:
+                        raise ValueError(f"{provider_name} API error ({response.status_code}): {response.text[:500]}")
+                    
+                    content = response.json()["choices"][0]["message"]["content"].strip()
+                    
+                    # Clean markdown formatting
+                    if "```json" in content:
+                        match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
+                        if match:
+                            content = match.group(1).strip()
+                    elif "```" in content:
+                        match = re.search(r'```\s*(.*?)\s*```', content, re.DOTALL)
+                        if match:
+                            content = match.group(1).strip()
+                    
+                    # Find JSON object
+                    if not content.startswith("{"):
+                        json_match = re.search(r'(\{.*\})', content, re.DOTALL)
+                        if json_match:
+                            content = json_match.group(1)
+                    
+                    content = content.strip()
+                    
+                    try:
+                        flashcard_data = json.loads(content)
+                    except json.JSONDecodeError as e:
+                        if attempt < max_retries - 1:
+                            continue
+                        raise ValueError(f"JSON parse error: {e}. Response: {content[:500]}")
+                    
+                    if "cards" not in flashcard_data:
+                        if attempt < max_retries - 1:
+                            continue
+                        raise ValueError("Missing 'cards' field")
+                    
+                    # Validate cards
+                    valid_cards = []
+                    for card in flashcard_data["cards"]:
+                        if all(k in card for k in ["question", "answer", "options", "correct_option"]):
+                            if len(card.get("options", [])) == 4:
+                                card["correct_option"] = int(card.get("correct_option", 0))
+                                card["difficulty"] = int(card.get("difficulty", 2))
+                                valid_cards.append(card)
+                    
+                    if len(valid_cards) < num_cards * 0.5:
+                        if attempt < max_retries - 1:
+                            continue
+                        raise ValueError(f"Only generated {len(valid_cards)} valid cards")
+                    
+                    flashcard_data["cards"] = valid_cards[:num_cards]
+                    return flashcard_data
+                    
+            except Exception as e:
+                last_error = e
+                if attempt >= max_retries - 1:
+                    raise
+        
+        raise last_error or ValueError("Flashcard generation failed after retries")

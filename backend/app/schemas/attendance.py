@@ -174,6 +174,7 @@ class AttendanceMarkResult(BaseModel):
     attendance_status: Optional[AttendanceStatus] = None
     failure_reason: Optional[FailureReason] = None
     face_match_score: Optional[float] = None
+    face_match_label: Optional[str] = None
 
 
 # ============== Attendance Record Schemas ==============

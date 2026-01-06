@@ -121,6 +121,30 @@ class ApiClient {
         return response.json();
     }
 
+    async uploadFile(file: File) {
+        const token = this.getToken();
+        const headers: Record<string, string> = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`${API_URL}/uploads`, {
+            method: 'POST',
+            headers,
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Upload failed' }));
+            throw new Error(error.detail || 'Upload failed');
+        }
+
+        return response.json();
+    }
+
     async getPDF(id: number) {
         return this.request(`/pdfs/${id}`);
     }
@@ -1149,6 +1173,23 @@ class ApiClient {
         });
     }
 
+    async updateStudyCircle(circleId: number, data: { name?: string; description?: string; course_id?: number; subject_code?: string; has_voice_room?: boolean; is_active?: boolean }) {
+        return this.request(`/study-circles/${circleId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async deleteStudyCircle(circleId: number) {
+        return this.request(`/study-circles/${circleId}`, {
+            method: 'DELETE',
+        });
+    }
+
+    async getAllStudyCircles() {
+        return this.request('/study-circles/all');
+    }
+
     async autoEnrollCircles() {
         return this.request('/study-circles/auto-enroll', { method: 'POST' });
     }
@@ -1213,6 +1254,19 @@ class ApiClient {
         return this.request(`/flashcards/sets/${setId}/cards`, {
             method: 'POST',
             body: JSON.stringify(data),
+        });
+    }
+
+    async generateFlashcardsFromTopic(topic: string, options?: { subject_code?: string; num_cards?: number; difficulty?: string; auto_publish?: boolean }) {
+        return this.request('/flashcards/generate-from-topic', {
+            method: 'POST',
+            body: JSON.stringify({
+                topic,
+                subject_code: options?.subject_code,
+                num_cards: options?.num_cards || 10,
+                difficulty: options?.difficulty || 'medium',
+                auto_publish: options?.auto_publish ?? true,
+            }),
         });
     }
 

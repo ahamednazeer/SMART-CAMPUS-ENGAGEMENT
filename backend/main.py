@@ -30,7 +30,9 @@ from app.routers import (
 )
 from app.routers.bonafide import router as bonafide_router
 from app.routers.queries import router as queries_router
+from app.routers.queries import router as queries_router
 from app.routers.complaints import router as complaints_router
+from app.routers.uploads import router as uploads_router
 
 
 @asynccontextmanager
@@ -113,6 +115,7 @@ app.include_router(warden_router)
 app.include_router(bonafide_router)
 app.include_router(queries_router)
 app.include_router(complaints_router)
+app.include_router(uploads_router)
 app.include_router(ai_assistant_router)
 app.include_router(faculty_location_router)
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import {
     Trophy, Zap, Clock, CheckCircle, XCircle, ArrowLeft,
-    Users, Star, Target, TrendingUp, Award, Play, Loader2, RefreshCw
+    Users, Star, Target, TrendingUp, Award, Play, Loader2, RefreshCw, Sparkles, X
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -54,6 +54,13 @@ export default function FlashcardBattlesPage() {
     const [answerResult, setAnswerResult] = useState<{ correct: boolean; correctAnswer: number } | null>(null);
     const [startTime, setStartTime] = useState<number | null>(null);
 
+    // AI Generation state
+    const [showGenerateModal, setShowGenerateModal] = useState(false);
+    const [generateTopic, setGenerateTopic] = useState('');
+    const [generateDifficulty, setGenerateDifficulty] = useState('medium');
+    const [generating, setGenerating] = useState(false);
+    const [generateError, setGenerateError] = useState('');
+
     useEffect(() => {
         loadData();
     }, []);
@@ -84,7 +91,43 @@ export default function FlashcardBattlesPage() {
         }
     };
 
+    const handleGenerateFlashcards = async () => {
+        console.log('Generate button clicked, topic:', generateTopic);
+        if (!generateTopic.trim()) {
+            console.log('Topic is empty, returning');
+            return;
+        }
+
+        try {
+            setGenerating(true);
+            setGenerateError('');
+            console.log('Calling API...');
+
+
+            await api.generateFlashcardsFromTopic(generateTopic, {
+                difficulty: generateDifficulty,
+                num_cards: 10,
+                auto_publish: true
+            });
+
+            // Reload data and close modal
+            await loadData();
+            setShowGenerateModal(false);
+            setGenerateTopic('');
+        } catch (error: any) {
+            setGenerateError(error.message || 'Failed to generate flashcards');
+        } finally {
+            setGenerating(false);
+        }
+    };
+
     const startBattle = async (set: FlashcardSet) => {
+        // Check if set has cards
+        if (set.total_cards === 0) {
+            alert('This flashcard set has no cards. Please add cards before starting a battle.');
+            return;
+        }
+
         try {
             setSelectedSet(set);
             setGameState('waiting');
@@ -102,8 +145,9 @@ export default function FlashcardBattlesPage() {
             setScore(0);
             setCorrectAnswers(0);
             setQuestionIndex(0);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error starting battle:', error);
+            alert(error?.message || 'Failed to start battle. Please try again.');
             setGameState('idle');
         }
     };
@@ -292,10 +336,10 @@ export default function FlashcardBattlesPage() {
                             <div
                                 key={idx}
                                 className={`h-2 flex-1 rounded-full ${idx < questionIndex
-                                        ? 'bg-green-500'
-                                        : idx === questionIndex
-                                            ? 'bg-amber-500'
-                                            : 'bg-gray-200 dark:bg-gray-700'
+                                    ? 'bg-green-500'
+                                    : idx === questionIndex
+                                        ? 'bg-amber-500'
+                                        : 'bg-gray-200 dark:bg-gray-700'
                                     }`}
                             />
                         ))}
@@ -375,116 +419,214 @@ export default function FlashcardBattlesPage() {
 
     // Main menu
     return (
-        <div className="p-6 space-y-6">
-            <Link href="/dashboard/student/learning" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white mb-4">
-                <ArrowLeft className="w-5 h-5" />
-                Back to Learning Hub
-            </Link>
+        <>
+            <div className="p-6 space-y-6">
+                <Link href="/dashboard/student/learning" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white mb-4">
+                    <ArrowLeft className="w-5 h-5" />
+                    Back to Learning Hub
+                </Link>
 
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <Trophy className="w-7 h-7 text-amber-500" />
-                        Flashcard Battles
-                    </h1>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">
-                        Challenge yourself and compete for the top spot!
-                    </p>
-                </div>
-            </div>
-
-            {/* Stats Cards */}
-            {stats && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                                <Target className="w-5 h-5 text-purple-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total_battles}</div>
-                                <div className="text-sm text-gray-500">Battles</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                                <Trophy className="w-5 h-5 text-green-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.wins}</div>
-                                <div className="text-sm text-gray-500">Wins</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                                <TrendingUp className="w-5 h-5 text-amber-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.win_rate.toFixed(0)}%</div>
-                                <div className="text-sm text-gray-500">Win Rate</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                                <Star className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.average_score.toFixed(0)}</div>
-                                <div className="text-sm text-gray-500">Avg Score</div>
-                            </div>
-                        </div>
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <Trophy className="w-7 h-7 text-amber-500" />
+                            Flashcard Battles
+                        </h1>
+                        <p className="text-gray-600 dark:text-gray-400 mt-1">
+                            Challenge yourself and compete for the top spot!
+                        </p>
                     </div>
                 </div>
-            )}
 
-            {/* Flashcard Sets */}
-            <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Choose a Set to Battle</h2>
-                {sets.length === 0 ? (
-                    <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                        <Trophy className="w-16 h-16 text-gray-400 mx-auto mb-3" />
-                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No Flashcard Sets Available</h3>
-                        <p className="text-gray-500 dark:text-gray-400">Check back later for new sets</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {sets.map(set => (
-                            <div key={set.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg transition-shadow">
-                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{set.title}</h3>
-                                {set.description && (
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{set.description}</p>
-                                )}
-                                {set.topic && (
-                                    <span className="inline-block px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded-full mb-3">
-                                        {set.topic}
-                                    </span>
-                                )}
-                                <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
-                                    <span>{set.total_cards} cards</span>
-                                    <span className="flex items-center gap-1">
-                                        <Users className="w-3 h-3" />
-                                        {set.times_played} plays
-                                    </span>
+                {/* Stats Cards */}
+                {stats && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                                    <Target className="w-5 h-5 text-purple-600" />
                                 </div>
-                                <button
-                                    onClick={() => startBattle(set)}
-                                    className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-medium hover:from-amber-600 hover:to-orange-600 transition-all flex items-center justify-center gap-2"
-                                >
-                                    <Play className="w-4 h-4" />
-                                    Start Battle
-                                </button>
+                                <div>
+                                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total_battles}</div>
+                                    <div className="text-sm text-gray-500">Battles</div>
+                                </div>
                             </div>
-                        ))}
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                                    <Trophy className="w-5 h-5 text-green-600" />
+                                </div>
+                                <div>
+                                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.wins}</div>
+                                    <div className="text-sm text-gray-500">Wins</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                    <TrendingUp className="w-5 h-5 text-amber-600" />
+                                </div>
+                                <div>
+                                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.win_rate.toFixed(0)}%</div>
+                                    <div className="text-sm text-gray-500">Win Rate</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                                    <Star className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <div>
+                                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.average_score.toFixed(0)}</div>
+                                    <div className="text-sm text-gray-500">Avg Score</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
+
+                {/* Flashcard Sets */}
+                <div>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Choose a Set to Battle</h2>
+                        <button
+                            onClick={() => setShowGenerateModal(true)}
+                            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center gap-2 font-medium"
+                        >
+                            <Sparkles className="w-4 h-4" />
+                            Generate with AI
+                        </button>
+                    </div>
+                    {sets.length === 0 ? (
+                        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                            <Trophy className="w-16 h-16 text-gray-400 mx-auto mb-3" />
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No Flashcard Sets Available</h3>
+                            <p className="text-gray-500 dark:text-gray-400 mb-4">Generate flashcards using AI to get started!</p>
+                            <button
+                                onClick={() => setShowGenerateModal(true)}
+                                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center gap-2 font-medium mx-auto"
+                            >
+                                <Sparkles className="w-5 h-5" />
+                                Generate Flashcards with AI
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {sets.map(set => (
+                                <div key={set.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg transition-shadow">
+                                    <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{set.title}</h3>
+                                    {set.description && (
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{set.description}</p>
+                                    )}
+                                    {set.topic && (
+                                        <span className="inline-block px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded-full mb-3">
+                                            {set.topic}
+                                        </span>
+                                    )}
+                                    <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
+                                        <span>{set.total_cards} cards</span>
+                                        <span className="flex items-center gap-1">
+                                            <Users className="w-3 h-3" />
+                                            {set.times_played} plays
+                                        </span>
+                                    </div>
+                                    <button
+                                        onClick={() => startBattle(set)}
+                                        className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-medium hover:from-amber-600 hover:to-orange-600 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Play className="w-4 h-4" />
+                                        Start Battle
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
-        </div>
+
+            {/* AI Generate Modal */}
+            {
+                showGenerateModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <Sparkles className="w-6 h-6 text-purple-500" />
+                                    Generate Flashcards with AI
+                                </h3>
+                                <button
+                                    onClick={() => setShowGenerateModal(false)}
+                                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Topic *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={generateTopic}
+                                        onChange={(e) => setGenerateTopic(e.target.value)}
+                                        placeholder="e.g., Data Structures, Machine Learning, Indian History"
+                                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Difficulty Level
+                                    </label>
+                                    <select
+                                        value={generateDifficulty}
+                                        onChange={(e) => setGenerateDifficulty(e.target.value)}
+                                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    >
+                                        <option value="easy">Easy - Basic definitions & facts</option>
+                                        <option value="medium">Medium - Understanding concepts</option>
+                                        <option value="hard">Hard - Analysis & application</option>
+                                    </select>
+                                </div>
+
+                                {generateError && (
+                                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
+                                        {generateError}
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={handleGenerateFlashcards}
+                                    disabled={generating || !generateTopic.trim()}
+                                    className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {generating ? (
+                                        <>
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                            Generating... (this may take a minute)
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="w-5 h-5" />
+                                            Generate 10 Flashcards
+                                        </>
+                                    )}
+                                </button>
+
+                                <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                                    AI will generate 10 flashcards based on the topic. You can start a battle immediately after generation.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </>
     );
 }

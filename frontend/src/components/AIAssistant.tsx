@@ -30,6 +30,7 @@ import {
 } from '@phosphor-icons/react';
 import { useAIAssistant } from './AIAssistantContext';
 import { api } from '@/lib/api';
+import ReactMarkdown from 'react-markdown';
 
 // Context chips based on module - using full class strings since Tailwind purges dynamic classes
 const getContextInfo = (module: string) => {
@@ -224,11 +225,50 @@ const ChatMessage = React.memo(({
         <div className="flex items-start gap-3 group animate-in fade-in slide-in-from-left-4 duration-300">
             <AIAvatar isThinking={false} />
             <div className="flex-1 max-w-[85%]">
-                <div className="bg-slate-800/60 backdrop-blur-sm px-4 py-3 rounded-2xl rounded-tl-md border border-slate-700/50 text-sm text-slate-200 leading-relaxed relative">
+                <div className="bg-slate-800/60 backdrop-blur-sm px-5 py-3.5 rounded-2xl rounded-tl-md border border-slate-700/50 text-sm text-slate-200 leading-relaxed relative">
                     {isLatestAssistant && !isTypingComplete ? (
                         <TypewriterText text={content} onComplete={() => setIsTypingComplete(true)} />
                     ) : (
-                        <div className="whitespace-pre-wrap">{content}</div>
+                        <div className="ai-chat-markdown text-[13.5px] leading-[1.6]">
+                            <ReactMarkdown
+                                components={{
+                                    h1: ({ children }) => <h1 className="text-[15px] font-semibold text-white mt-3 mb-1 first:mt-0">{children}</h1>,
+                                    h2: ({ children }) => <h2 className="text-[14.5px] font-semibold text-white mt-2.5 mb-1 first:mt-0">{children}</h2>,
+                                    h3: ({ children }) => <h3 className="text-[14px] font-semibold text-white mt-2 mb-0.5 first:mt-0">{children}</h3>,
+                                    h4: ({ children }) => <h4 className="text-[13.5px] font-semibold text-white mt-1.5 mb-0.5">{children}</h4>,
+                                    p: ({ children }) => <p className="my-1 text-slate-200 first:mt-0 last:mb-0">{children}</p>,
+                                    ul: ({ children }) => <ul className="my-1 pl-5 space-y-0.5 list-disc marker:text-slate-500">{children}</ul>,
+                                    ol: ({ children }) => <ol className="my-1 pl-5 space-y-0.5 list-decimal marker:text-slate-500">{children}</ol>,
+                                    li: ({ children }) => <li className="text-slate-200 pl-0.5">{children}</li>,
+                                    strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                                    em: ({ children }) => <em className="italic">{children}</em>,
+                                    code: ({ children, className }) => {
+                                        const isInline = !className;
+                                        return isInline
+                                            ? <code className="px-1 py-0.5 bg-slate-700/60 rounded text-[12px] font-mono text-slate-100">{children}</code>
+                                            : <code className={className}>{children}</code>;
+                                    },
+                                    pre: ({ children }) => (
+                                        <pre className="my-2 p-3 bg-slate-900 rounded-lg overflow-x-auto text-[12px] font-mono border border-slate-700/50">
+                                            {children}
+                                        </pre>
+                                    ),
+                                    blockquote: ({ children }) => (
+                                        <blockquote className="my-1.5 pl-3 border-l-2 border-slate-600 text-slate-300 italic">
+                                            {children}
+                                        </blockquote>
+                                    ),
+                                    a: ({ href, children }) => (
+                                        <a href={href} className="text-blue-400 hover:text-blue-300 underline underline-offset-2" target="_blank" rel="noopener noreferrer">
+                                            {children}
+                                        </a>
+                                    ),
+                                    hr: () => <hr className="my-2 border-slate-700" />,
+                                }}
+                            >
+                                {content}
+                            </ReactMarkdown>
+                        </div>
                     )}
 
                     {isTypingComplete && (
@@ -358,11 +398,13 @@ export default function AIAssistant() {
     const [transcribing, setTranscribing] = useState(false);
     const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [isAnimating, setIsAnimating] = useState(false);
     const [panelSize, setPanelSize] = useState({ width: 400, height: 560 });
     const [panelPosition, setPanelPosition] = useState({ bottom: 96, right: 24 });
     const [isResizing, setIsResizing] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [containerWidth, setContainerWidth] = useState(400);
+    const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -372,6 +414,16 @@ export default function AIAssistant() {
     const recordingStartTimeRef = useRef<number>(0);
     const shouldTranscribeRef = useRef<boolean>(false);
     const dragStartRef = useRef({ mouseX: 0, mouseY: 0, right: 0, bottom: 0 });
+
+    // Track window size for smooth expand animation
+    useEffect(() => {
+        const updateWindowSize = () => {
+            setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+        };
+        updateWindowSize();
+        window.addEventListener('resize', updateWindowSize);
+        return () => window.removeEventListener('resize', updateWindowSize);
+    }, []);
 
     useEffect(() => {
         if (!containerRef.current) return;
@@ -571,6 +623,7 @@ export default function AIAssistant() {
             {/* Floating Button */}
             <button
                 onClick={toggleOpen}
+                data-walkthrough="ai-assistant"
                 className={`fixed bottom-6 right-6 z-50 flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-300 group border ${isOpen
                     ? 'bg-slate-800 hover:bg-slate-700 border-slate-600'
                     : 'bg-slate-800/90 hover:bg-slate-700 border-slate-700 hover:border-blue-500/50 hover:scale-105'
@@ -591,17 +644,19 @@ export default function AIAssistant() {
             {/* Chat Panel */}
             {isOpen && (
                 <div
-                    className={`fixed z-50 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all backdrop-blur-xl ${isResizing || isDragging ? 'duration-0' : 'duration-300'} ${isExpanded ? 'inset-6 w-auto max-w-none' : ''}`}
+                    className={`fixed z-50 rounded-2xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl ${isResizing || isDragging ? '' : 'transition-[width,height,left,top,right,bottom,transform] duration-300 ease-out'}`}
                     style={{
-                        width: isExpanded ? 'auto' : `${panelSize.width}px`,
-                        height: isExpanded ? 'auto' : `${panelSize.height}px`,
+                        width: isExpanded ? `${windowSize.width - 48}px` : `${panelSize.width}px`,
+                        height: isExpanded ? `${windowSize.height - 48}px` : `${panelSize.height}px`,
                         bottom: isExpanded ? '24px' : `${panelPosition.bottom}px`,
                         right: isExpanded ? '24px' : `${panelPosition.right}px`,
                         maxHeight: isExpanded ? 'none' : 'calc(100vh - 120px)',
                         background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(2, 6, 23, 0.98) 100%)',
                         border: '1px solid rgba(51, 65, 85, 0.5)',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(59, 130, 246, 0.1) inset'
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(59, 130, 246, 0.1) inset',
+                        willChange: isAnimating ? 'width, height, right, bottom' : 'auto'
                     }}
+                    onTransitionEnd={() => setIsAnimating(false)}
                 >
                     {/* Resize Handles */}
                     {!isExpanded && (
@@ -640,7 +695,10 @@ export default function AIAssistant() {
                         </div>
                         <div className="flex items-center gap-1">
                             <button
-                                onClick={() => setIsExpanded(!isExpanded)}
+                                onClick={() => {
+                                    setIsAnimating(true);
+                                    setIsExpanded(!isExpanded);
+                                }}
                                 className="p-2 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-white transition-all"
                                 title={isExpanded ? "Minimize" : "Expand"}
                             >

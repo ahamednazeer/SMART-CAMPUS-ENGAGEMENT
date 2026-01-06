@@ -67,6 +67,7 @@ const withPWA = withPWAInit({
 const nextConfig = {
     // Empty turbopack config to silence the webpack warning in dev mode
     turbopack: {},
+    output: 'standalone',
 };
 
 export default withPWA(nextConfig);

@@ -28,6 +28,15 @@ class CircleCreate(BaseModel):
     has_voice_room: bool = False
 
 
+class CircleUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    course_id: int | None = None
+    subject_code: str | None = None
+    has_voice_room: bool | None = None
+    is_active: bool | None = None
+
+
 class ChannelCreate(BaseModel):
     name: str
     description: str | None = None
@@ -80,6 +89,8 @@ class MessageResponse(BaseModel):
     thread_count: int
     is_pinned: bool
     created_at: datetime
+    user_name: str | None = None
+    user_initials: str | None = None
     
     class Config:
         from_attributes = True
@@ -125,6 +136,18 @@ async def get_my_circles(
     return circles
 
 
+@router.get("/all", response_model=list[CircleResponse])
+async def get_all_circles(
+    active_only: bool = True,
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.STAFF])),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all study circles (Admin/Staff only)."""
+    service = StudyCircleService(db)
+    circles = await service.get_all_circles(active_only=active_only)
+    return circles
+
+
 @router.post("/auto-enroll")
 async def auto_enroll(
     current_user: User = Depends(get_current_user),
@@ -137,8 +160,6 @@ async def auto_enroll(
         "message": f"Enrolled in {len(circles)} circles",
         "circles": [{"id": c.id, "name": c.name} for c in circles]
     }
-
-
 @router.get("/{circle_id}", response_model=CircleResponse)
 async def get_circle(
     circle_id: int,
@@ -163,6 +184,44 @@ async def get_circle(
             detail="Circle not found"
         )
     return circle
+
+
+@router.put("/{circle_id}", response_model=CircleResponse)
+async def update_circle(
+    circle_id: int,
+    data: CircleUpdate,
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.STAFF])),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update a study circle (Admin/Staff only)."""
+    service = StudyCircleService(db)
+    circle = await service.update_circle(
+        circle_id=circle_id,
+        **data.model_dump(exclude_unset=True)
+    )
+    if not circle:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Circle not found"
+        )
+    return circle
+
+
+@router.delete("/{circle_id}")
+async def delete_circle(
+    circle_id: int,
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.STAFF])),
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete a study circle (Admin/Staff only)."""
+    service = StudyCircleService(db)
+    success = await service.delete_circle(circle_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Circle not found"
+        )
+    return {"message": "Circle deleted successfully"}
 
 
 # ============== Channel Endpoints ==============

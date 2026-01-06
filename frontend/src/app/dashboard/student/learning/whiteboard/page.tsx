@@ -54,7 +54,7 @@ export default function WhiteboardPage() {
         loadSessions();
         // Load fabric.js dynamically
         import('fabric').then((module) => {
-            fabric = module.fabric || module;
+            fabric = module;
         });
     }, []);
 
@@ -325,8 +325,8 @@ export default function WhiteboardPage() {
                                 }
                             }}
                             className={`p-2 rounded-lg transition-colors ${tool === t.id
-                                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600'
-                                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
+                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600'
+                                : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
                                 }`}
                             title={t.label}
                         >

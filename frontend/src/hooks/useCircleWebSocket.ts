@@ -34,7 +34,7 @@ export function useCircleWebSocket({
     const wsRef = useRef<WebSocket | null>(null);
     const [connected, setConnected] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+    const reconnectTimeoutRef = useRef<NodeJS.Timeout>(undefined);
 
     const connect = useCallback(() => {
         const token = localStorage.getItem('token');

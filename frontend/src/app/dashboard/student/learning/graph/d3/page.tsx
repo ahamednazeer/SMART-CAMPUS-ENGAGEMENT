@@ -152,7 +152,7 @@ export default function KnowledgeGraphD3Page() {
             .data(graphData.nodes)
             .join('g')
             .attr('cursor', 'pointer')
-            .call(d3.drag<SVGGElement, TopicNode>()
+            .call(d3.drag<any, TopicNode>()
                 .on('start', (event, d) => {
                     if (!event.active) simulation.alphaTarget(0.3).restart();
                     d.fx = d.x;

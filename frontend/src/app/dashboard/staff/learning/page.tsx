@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import {
     BookOpen, Users, Trophy, Video, Plus, Trash2, Edit2,
-    Save, X, ChevronRight, Layers, Brain, Star, Search
+    Save, X, ChevronRight, Layers, Brain, Star, Search, Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -46,9 +46,20 @@ interface DoubtSession {
     host_id: number;
 }
 
+interface StudyCircle {
+    id: number;
+    name: string;
+    description?: string;
+    course_id?: number;
+    subject_code?: string;
+    has_voice_room: boolean;
+    is_active: boolean;
+}
+
 export default function StaffLearningPage() {
-    const [activeTab, setActiveTab] = useState<'courses' | 'flashcards' | 'sessions' | 'topics'>('courses');
+    const [activeTab, setActiveTab] = useState<'courses' | 'flashcards' | 'sessions' | 'circles' | 'topics'>('courses');
     const [courses, setCourses] = useState<Course[]>([]);
+    const [studyCircles, setStudyCircles] = useState<StudyCircle[]>([]);
     const [flashcardSets, setFlashcardSets] = useState<FlashcardSet[]>([]);
     const [doubtSessions, setDoubtSessions] = useState<DoubtSession[]>([]);
     const [pastSessions, setPastSessions] = useState<DoubtSession[]>([]);
@@ -75,6 +86,28 @@ export default function StaffLearningPage() {
         topic: '',
         subject_code: '',
     });
+
+    // Circle form
+    const [showCircleForm, setShowCircleForm] = useState(false);
+    const [editingCircleId, setEditingCircleId] = useState<number | null>(null);
+    const [circleForm, setCircleForm] = useState({
+        name: '',
+        description: '',
+        course_id: undefined as number | undefined,
+        subject_code: '',
+        has_voice_room: false,
+    });
+
+    // AI Generation
+    const [showAIModal, setShowAIModal] = useState(false);
+    const [generateTopic, setGenerateTopic] = useState('');
+    const [generateDifficulty, setGenerateDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+    const [generateCount, setGenerateCount] = useState(10);
+    const [generating, setGenerating] = useState(false);
+    const [generateError, setGenerateError] = useState('');
+
+    const [studentsLoading, setStudentsLoading] = useState(false);
+    const [studentsError, setStudentsError] = useState('');
 
     // Enroll modal
     const [showEnrollModal, setShowEnrollModal] = useState(false);
@@ -113,6 +146,13 @@ export default function StaffLearningPage() {
             } else if (activeTab === 'topics') {
                 const data = await api.getKnowledgeTopics();
                 setKnowledgeTopics(data || []);
+            } else if (activeTab === 'circles') {
+                const [circlesData, coursesData] = await Promise.all([
+                    api.getAllStudyCircles(),
+                    api.getCourses()
+                ]);
+                setStudyCircles(circlesData || []);
+                setCourses(coursesData || []);
             }
         } catch (error) {
             console.error('Error loading data:', error);
@@ -123,10 +163,15 @@ export default function StaffLearningPage() {
 
     const loadStudents = async () => {
         try {
+            setStudentsLoading(true);
+            setStudentsError('');
             const data = await api.getEnrollableStudents();
-            setStudents(data);
-        } catch (error) {
+            setStudents(data || []);
+        } catch (error: any) {
             console.error('Error loading students:', error);
+            setStudentsError(error?.message || 'Failed to load students');
+        } finally {
+            setStudentsLoading(false);
         }
     };
 
@@ -134,6 +179,7 @@ export default function StaffLearningPage() {
         setEnrollCourse(course);
         setSelectedStudents([]);
         setStudentSearch('');
+        setStudentsError('');
         setShowEnrollModal(true);
         loadStudents();
     };
@@ -229,6 +275,70 @@ export default function StaffLearningPage() {
         }
     };
 
+    const handleGenerateFlashcards = async () => {
+        if (!generateTopic.trim()) return;
+
+        try {
+            setGenerating(true);
+            setGenerateError('');
+            await api.generateFlashcardsFromTopic(generateTopic, {
+                difficulty: generateDifficulty,
+                num_cards: generateCount,
+            });
+            setShowAIModal(false);
+            setGenerateTopic('');
+            setGenerateDifficulty('medium');
+            setGenerateCount(10);
+            loadData();
+            alert(`Successfully generated ${generateCount} flashcards on "${generateTopic}"!`);
+        } catch (error) {
+            console.error('Error generating flashcards:', error);
+            setGenerateError('Failed to generate flashcards. Please try again.');
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    const handleCreateCircle = async () => {
+        try {
+            if (editingCircleId) {
+                await api.updateStudyCircle(editingCircleId, circleForm);
+            } else {
+                await api.createStudyCircle(circleForm);
+            }
+            setShowCircleForm(false);
+            setEditingCircleId(null);
+            setCircleForm({ name: '', description: '', course_id: undefined, subject_code: '', has_voice_room: false });
+            loadData();
+        } catch (error) {
+            console.error('Error saving study circle:', error);
+            alert(`Failed to ${editingCircleId ? 'update' : 'create'} study circle`);
+        }
+    };
+
+    const handleEditCircle = (circle: any) => {
+        setEditingCircleId(circle.id);
+        setCircleForm({
+            name: circle.name,
+            description: circle.description || '',
+            course_id: circle.course_id,
+            subject_code: circle.subject_code || '',
+            has_voice_room: circle.has_voice_room,
+        });
+        setShowCircleForm(true);
+    };
+
+    const handleDeleteCircle = async (circleId: number) => {
+        if (!window.confirm('Are you sure you want to delete this study circle?')) return;
+        try {
+            await api.deleteStudyCircle(circleId);
+            loadData();
+        } catch (error) {
+            console.error('Error deleting study circle:', error);
+            alert('Failed to delete study circle');
+        }
+    };
+
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
@@ -250,6 +360,7 @@ export default function StaffLearningPage() {
                     { id: 'courses', label: 'Courses', icon: BookOpen },
                     { id: 'flashcards', label: 'Flashcard Sets', icon: Trophy },
                     { id: 'sessions', label: 'Doubt Sessions', icon: Video },
+                    { id: 'circles', label: 'Study Circles', icon: Users },
                     { id: 'topics', label: 'Knowledge Topics', icon: Brain },
                 ].map(tab => (
                     <button
@@ -280,89 +391,7 @@ export default function StaffLearningPage() {
                         </button>
                     </div>
 
-                    {/* Course Form Modal */}
-                    {showCourseForm && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Create Course</h3>
-                                    <button onClick={() => setShowCourseForm(false)}>
-                                        <X className="w-5 h-5 text-gray-500" />
-                                    </button>
-                                </div>
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Code</label>
-                                            <input
-                                                type="text"
-                                                value={courseForm.code}
-                                                onChange={e => setCourseForm({ ...courseForm, code: e.target.value })}
-                                                placeholder="CS201"
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Credits</label>
-                                            <input
-                                                type="number"
-                                                value={courseForm.credits}
-                                                onChange={e => setCourseForm({ ...courseForm, credits: parseInt(e.target.value) })}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
-                                        <input
-                                            type="text"
-                                            value={courseForm.name}
-                                            onChange={e => setCourseForm({ ...courseForm, name: e.target.value })}
-                                            placeholder="Data Structures"
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department</label>
-                                            <input
-                                                type="text"
-                                                value={courseForm.department}
-                                                onChange={e => setCourseForm({ ...courseForm, department: e.target.value })}
-                                                placeholder="CSE"
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Semester</label>
-                                            <input
-                                                type="number"
-                                                value={courseForm.semester}
-                                                onChange={e => setCourseForm({ ...courseForm, semester: parseInt(e.target.value) })}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-                                        <textarea
-                                            value={courseForm.description}
-                                            onChange={e => setCourseForm({ ...courseForm, description: e.target.value })}
-                                            rows={2}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={handleCreateCourse}
-                                        className="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center justify-center gap-2"
-                                    >
-                                        <Save className="w-4 h-4" />
-                                        Create Course
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+
 
                     {/* Course List */}
                     {loading ? (
@@ -408,89 +437,7 @@ export default function StaffLearningPage() {
                         </div>
                     )}
 
-                    {/* Enroll Modal */}
-                    {showEnrollModal && enrollCourse && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg max-h-[80vh] flex flex-col">
-                                <div className="flex justify-between items-center mb-4">
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Enroll Students</h3>
-                                        <p className="text-sm text-gray-500">{enrollCourse.code} - {enrollCourse.name}</p>
-                                    </div>
-                                    <button onClick={() => setShowEnrollModal(false)}>
-                                        <X className="w-5 h-5 text-gray-500" />
-                                    </button>
-                                </div>
 
-                                {/* Search */}
-                                <div className="relative mb-4">
-                                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                    <input
-                                        type="text"
-                                        value={studentSearch}
-                                        onChange={e => setStudentSearch(e.target.value)}
-                                        placeholder="Search students..."
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    />
-                                </div>
-
-                                {/* Select All */}
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="text-sm text-gray-500">{selectedStudents.length} selected</span>
-                                    <button onClick={selectAllStudents} className="text-sm text-blue-600 hover:underline">
-                                        Select All ({filteredStudents.length})
-                                    </button>
-                                </div>
-
-                                {/* Student List */}
-                                <div className="flex-1 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg mb-4">
-                                    {filteredStudents.length === 0 ? (
-                                        <div className="text-center py-8 text-gray-500">No students found</div>
-                                    ) : (
-                                        filteredStudents.map(student => (
-                                            <label
-                                                key={student.id}
-                                                className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedStudents.includes(student.id)}
-                                                    onChange={() => toggleStudent(student.id)}
-                                                    className="w-4 h-4 text-blue-600 rounded"
-                                                />
-                                                <div className="flex-1">
-                                                    <div className="font-medium text-gray-900 dark:text-white">
-                                                        {student.first_name} {student.last_name}
-                                                    </div>
-                                                    <div className="text-sm text-gray-500">
-                                                        {student.register_number || 'No Reg #'} • {student.department || 'No Dept'}
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        ))
-                                    )}
-                                </div>
-
-                                <button
-                                    onClick={handleEnroll}
-                                    disabled={enrolling || selectedStudents.length === 0}
-                                    className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                >
-                                    {enrolling ? (
-                                        <>
-                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                            Enrolling...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Users className="w-5 h-5" />
-                                            Enroll {selectedStudents.length} Student(s)
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -499,78 +446,28 @@ export default function StaffLearningPage() {
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Flashcard Sets</h2>
-                        <button
-                            onClick={() => setShowFlashcardForm(true)}
-                            className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 flex items-center gap-2"
-                        >
-                            <Plus className="w-4 h-4" />
-                            Create Set
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setShowAIModal(true)}
+                                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 flex items-center gap-2"
+                            >
+                                <Sparkles className="w-4 h-4" />
+                                AI Generate
+                            </button>
+                            <button
+                                onClick={() => setShowFlashcardForm(true)}
+                                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 flex items-center gap-2"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Create Set
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Flashcard Form Modal */}
-                    {showFlashcardForm && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Create Flashcard Set</h3>
-                                    <button onClick={() => setShowFlashcardForm(false)}>
-                                        <X className="w-5 h-5 text-gray-500" />
-                                    </button>
-                                </div>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
-                                        <input
-                                            type="text"
-                                            value={flashcardForm.title}
-                                            onChange={e => setFlashcardForm({ ...flashcardForm, title: e.target.value })}
-                                            placeholder="Binary Trees Basics"
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Topic</label>
-                                            <input
-                                                type="text"
-                                                value={flashcardForm.topic}
-                                                onChange={e => setFlashcardForm({ ...flashcardForm, topic: e.target.value })}
-                                                placeholder="Trees"
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject Code</label>
-                                            <input
-                                                type="text"
-                                                value={flashcardForm.subject_code}
-                                                onChange={e => setFlashcardForm({ ...flashcardForm, subject_code: e.target.value })}
-                                                placeholder="CS201"
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-                                        <textarea
-                                            value={flashcardForm.description}
-                                            onChange={e => setFlashcardForm({ ...flashcardForm, description: e.target.value })}
-                                            rows={2}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={handleCreateFlashcardSet}
-                                        className="w-full py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 flex items-center justify-center gap-2"
-                                    >
-                                        <Save className="w-4 h-4" />
-                                        Create Set
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+
+
+
+
 
                     {/* Flashcard List */}
                     {loading ? (
@@ -771,6 +668,79 @@ export default function StaffLearningPage() {
                 </div>
             )}
 
+            {/* Study Circles Tab */}
+            {activeTab === 'circles' && (
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Study Circles</h2>
+                        <button
+                            onClick={() => {
+                                setEditingCircleId(null);
+                                setCircleForm({ name: '', description: '', course_id: undefined, subject_code: '', has_voice_room: false });
+                                setShowCircleForm(true);
+                            }}
+                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Create Circle
+                        </button>
+                    </div>
+
+                    {studyCircles.length === 0 ? (
+                        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                            <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No Study Circles</h3>
+                            <p className="text-gray-500 dark:text-gray-400">Create a circle to start a community for a subject.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {studyCircles.map(circle => (
+                                <div key={circle.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-xl font-bold">
+                                            {circle.name.charAt(0)}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleEditCircle(circle)}
+                                                className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteCircle(circle.id)}
+                                                className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{circle.name}</h3>
+                                    {circle.subject_code && (
+                                        <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">{circle.subject_code}</span>
+                                    )}
+                                    {circle.description && (
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 line-clamp-2">{circle.description}</p>
+                                    )}
+                                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm">
+                                            <Video className={`w-4 h-4 ${circle.has_voice_room ? 'text-green-500' : 'text-gray-300'}`} />
+                                            <span>Voice {circle.has_voice_room ? 'Enabled' : 'Disabled'}</span>
+                                        </div>
+                                        <Link
+                                            href={`/dashboard/student/learning/circles`}
+                                            className="text-purple-600 hover:text-purple-700 text-sm font-medium flex items-center gap-1"
+                                        >
+                                            View <ChevronRight className="w-4 h-4" />
+                                        </Link>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Knowledge Topics Tab */}
             {activeTab === 'topics' && (
                 <div className="space-y-4">
@@ -830,6 +800,411 @@ export default function StaffLearningPage() {
                             ))}
                         </div>
                     )}
+                </div>
+            )}
+            {/* Course Form Modal */}
+            {showCourseForm && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Create Course</h3>
+                            <button onClick={() => setShowCourseForm(false)}>
+                                <X className="w-5 h-5 text-gray-500" />
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Code</label>
+                                    <input
+                                        type="text"
+                                        value={courseForm.code}
+                                        onChange={e => setCourseForm({ ...courseForm, code: e.target.value })}
+                                        placeholder="CS201"
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Credits</label>
+                                    <input
+                                        type="number"
+                                        value={courseForm.credits}
+                                        onChange={e => setCourseForm({ ...courseForm, credits: parseInt(e.target.value) })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+                                <input
+                                    type="text"
+                                    value={courseForm.name}
+                                    onChange={e => setCourseForm({ ...courseForm, name: e.target.value })}
+                                    placeholder="Data Structures"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department</label>
+                                    <input
+                                        type="text"
+                                        value={courseForm.department}
+                                        onChange={e => setCourseForm({ ...courseForm, department: e.target.value })}
+                                        placeholder="CSE"
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Semester</label>
+                                    <input
+                                        type="number"
+                                        value={courseForm.semester}
+                                        onChange={e => setCourseForm({ ...courseForm, semester: parseInt(e.target.value) })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                                <textarea
+                                    value={courseForm.description}
+                                    onChange={e => setCourseForm({ ...courseForm, description: e.target.value })}
+                                    rows={2}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                />
+                            </div>
+                            <button
+                                onClick={handleCreateCourse}
+                                className="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center justify-center gap-2"
+                            >
+                                <Save className="w-4 h-4" />
+                                Create Course
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Enroll Modal */}
+            {showEnrollModal && enrollCourse && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg max-h-[80vh] flex flex-col">
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Enroll Students</h3>
+                                <p className="text-sm text-gray-500">{enrollCourse.code} - {enrollCourse.name}</p>
+                            </div>
+                            <button onClick={() => setShowEnrollModal(false)}>
+                                <X className="w-5 h-5 text-gray-500" />
+                            </button>
+                        </div>
+
+                        {/* Search */}
+                        <div className="relative mb-4">
+                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                value={studentSearch}
+                                onChange={e => setStudentSearch(e.target.value)}
+                                placeholder="Search students..."
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            />
+                        </div>
+
+                        {/* Select All */}
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm text-gray-500">{selectedStudents.length} selected</span>
+                            <button onClick={selectAllStudents} className="text-sm text-blue-600 hover:underline">
+                                Select All ({filteredStudents.length})
+                            </button>
+                        </div>
+
+                        {/* Student List */}
+                        <div className="flex-1 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg mb-4">
+                            {studentsLoading ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent"></div>
+                                </div>
+                            ) : studentsError ? (
+                                <div className="text-center py-8 text-red-500">{studentsError}</div>
+                            ) : filteredStudents.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500">No students found</div>
+                            ) : (
+                                filteredStudents.map(student => (
+                                    <label
+                                        key={student.id}
+                                        className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedStudents.includes(student.id)}
+                                            onChange={() => toggleStudent(student.id)}
+                                            className="w-4 h-4 text-blue-600 rounded"
+                                        />
+                                        <div className="flex-1">
+                                            <div className="font-medium text-gray-900 dark:text-white">
+                                                {student.first_name} {student.last_name}
+                                            </div>
+                                            <div className="text-sm text-gray-500">
+                                                {student.register_number || 'No Reg #'} • {student.department || 'No Dept'}
+                                            </div>
+                                        </div>
+                                    </label>
+                                ))
+                            )}
+                        </div>
+
+                        <button
+                            onClick={handleEnroll}
+                            disabled={enrolling || selectedStudents.length === 0}
+                            className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {enrolling ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    Enrolling...
+                                </>
+                            ) : (
+                                <>
+                                    <Users className="w-5 h-5" />
+                                    Enroll {selectedStudents.length} Student(s)
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Flashcard Form Modal */}
+            {showFlashcardForm && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Create Flashcard Set</h3>
+                            <button onClick={() => setShowFlashcardForm(false)}>
+                                <X className="w-5 h-5 text-gray-500" />
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+                                <input
+                                    type="text"
+                                    value={flashcardForm.title}
+                                    onChange={e => setFlashcardForm({ ...flashcardForm, title: e.target.value })}
+                                    placeholder="Binary Trees Basics"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Topic</label>
+                                    <input
+                                        type="text"
+                                        value={flashcardForm.topic}
+                                        onChange={e => setFlashcardForm({ ...flashcardForm, topic: e.target.value })}
+                                        placeholder="Trees"
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject Code</label>
+                                    <input
+                                        type="text"
+                                        value={flashcardForm.subject_code}
+                                        onChange={e => setFlashcardForm({ ...flashcardForm, subject_code: e.target.value })}
+                                        placeholder="CS201"
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                                <textarea
+                                    value={flashcardForm.description}
+                                    onChange={e => setFlashcardForm({ ...flashcardForm, description: e.target.value })}
+                                    rows={2}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                />
+                            </div>
+                            <button
+                                onClick={handleCreateFlashcardSet}
+                                className="w-full py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 flex items-center justify-center gap-2"
+                            >
+                                <Save className="w-4 h-4" />
+                                Create Set
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* AI Generation Modal */}
+            {showAIModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
+                                    <Sparkles className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">AI Flashcard Generator</h3>
+                                    <p className="text-xs text-gray-500">Create flashcards from any topic</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowAIModal(false)}>
+                                <X className="w-5 h-5 text-gray-500" />
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Topic</label>
+                                <input
+                                    type="text"
+                                    value={generateTopic}
+                                    onChange={e => setGenerateTopic(e.target.value)}
+                                    placeholder="e.g., Photosynthesis, Binary Trees, French Revolution"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Difficulty</label>
+                                    <select
+                                        value={generateDifficulty}
+                                        onChange={e => setGenerateDifficulty(e.target.value as 'easy' | 'medium' | 'hard')}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    >
+                                        <option value="easy">Easy</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="hard">Hard</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cards</label>
+                                    <select
+                                        value={generateCount}
+                                        onChange={e => setGenerateCount(parseInt(e.target.value))}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    >
+                                        <option value={5}>5 cards</option>
+                                        <option value={10}>10 cards</option>
+                                        <option value={15}>15 cards</option>
+                                        <option value={20}>20 cards</option>
+                                    </select>
+                                </div>
+                            </div>
+                            {generateError && (
+                                <div className="p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm">
+                                    {generateError}
+                                </div>
+                            )}
+                            <button
+                                onClick={handleGenerateFlashcards}
+                                disabled={generating || !generateTopic.trim()}
+                                className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-lg font-medium hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {generating ? (
+                                    <>
+                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Generating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="w-5 h-5" />
+                                        Generate {generateCount} Flashcards
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Study Circle Form Modal */}
+            {showCircleForm && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                {editingCircleId ? 'Edit Study Circle' : 'Create Study Circle'}
+                            </h3>
+                            <button onClick={() => {
+                                setShowCircleForm(false);
+                                setEditingCircleId(null);
+                            }}>
+                                <X className="w-5 h-5 text-gray-500" />
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Circle Name</label>
+                                <input
+                                    type="text"
+                                    value={circleForm.name}
+                                    onChange={e => setCircleForm({ ...circleForm, name: e.target.value })}
+                                    placeholder="CS201 - Data Structures Hub"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject Code</label>
+                                    <input
+                                        type="text"
+                                        value={circleForm.subject_code}
+                                        onChange={e => setCircleForm({ ...circleForm, subject_code: e.target.value })}
+                                        placeholder="CS201"
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Linked Course</label>
+                                    <select
+                                        value={circleForm.course_id || ''}
+                                        onChange={e => setCircleForm({ ...circleForm, course_id: e.target.value ? parseInt(e.target.value) : undefined })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    >
+                                        <option value="">None</option>
+                                        {courses.map(course => (
+                                            <option key={course.id} value={course.id}>{course.code} - {course.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                                <textarea
+                                    value={circleForm.description}
+                                    onChange={e => setCircleForm({ ...circleForm, description: e.target.value })}
+                                    rows={2}
+                                    placeholder="A place to discuss data structures and algorithms"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id="has_voice_circle"
+                                    checked={circleForm.has_voice_room}
+                                    onChange={e => setCircleForm({ ...circleForm, has_voice_room: e.target.checked })}
+                                    className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                                />
+                                <label htmlFor="has_voice_circle" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Enable Voice Room (Jitsi)
+                                </label>
+                            </div>
+                            <button
+                                onClick={handleCreateCircle}
+                                className="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center justify-center gap-2 mt-2"
+                            >
+                                <Save className="w-4 h-4" />
+                                {editingCircleId ? 'Update Study Circle' : 'Create Study Circle'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
