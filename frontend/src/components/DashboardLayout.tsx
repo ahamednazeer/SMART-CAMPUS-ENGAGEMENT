@@ -22,7 +22,8 @@ import {
     DoorOpen,
     Certificate,
     ChatCircle,
-    Wrench
+    Wrench,
+    Sparkle
 } from '@phosphor-icons/react';
 import { AIAssistantProvider } from './AIAssistantContext';
 import AIAssistant from './AIAssistant';
@@ -67,6 +68,7 @@ const menuItemsByRole: Record<string, MenuItem[]> = {
     ],
     WARDEN: [
         { icon: Gauge, label: 'Hostel Dashboard', path: '/admin/hostel' },
+        { icon: Sparkle, label: 'Auto Assign', path: '/admin/hostel/auto-assign' },
         { icon: ChatCircle, label: 'Queries', path: '/admin/warden-queries' },
         { icon: Wrench, label: 'Complaints', path: '/admin/warden-complaints' },
     ],
@@ -212,7 +214,7 @@ export default function DashboardLayout({
                 if (pathname.startsWith('/admin')) {
                     if (userData.role === 'WARDEN') {
                         // Wardens can only access specific /admin/ routes
-                        const allowedWardenPaths = ['/admin/hostel', '/admin/warden-queries', '/admin/warden-complaints'];
+                        const allowedWardenPaths = ['/admin/hostel', '/admin/hostel/auto-assign', '/admin/warden-queries', '/admin/warden-complaints'];
                         const isAllowed = allowedWardenPaths.some(p => pathname.startsWith(p));
                         if (!isAllowed) {
                             router.replace('/admin/hostel');

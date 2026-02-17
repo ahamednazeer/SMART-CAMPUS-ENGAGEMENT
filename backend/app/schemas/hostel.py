@@ -1,6 +1,8 @@
 """Pydantic schemas for hostel management."""
 from datetime import datetime
 from pydantic import BaseModel, Field
+from app.models.hostel import HostelType
+from app.models.user import Gender
 
 
 # ==================== HOSTEL SCHEMAS ====================
@@ -9,6 +11,7 @@ class HostelBase(BaseModel):
     """Base hostel schema."""
     name: str = Field(..., min_length=1, max_length=100)
     address: str | None = None
+    hostel_type: HostelType = HostelType.CO_ED
     capacity: int = Field(default=100, ge=1)
 
 
@@ -21,6 +24,7 @@ class HostelUpdate(BaseModel):
     """Hostel update schema."""
     name: str | None = None
     address: str | None = None
+    hostel_type: HostelType | None = None
     capacity: int | None = Field(default=None, ge=1)
     warden_id: int | None = None
     is_active: bool | None = None
@@ -112,8 +116,85 @@ class HostelAssignmentWithDetails(HostelAssignmentOut):
     """Assignment with student and room names."""
     student_name: str
     student_register_number: str | None
+    student_email: str | None = None
+    student_department: str | None = None
+    student_batch: str | None = None
+    student_degree: str | None = None
+    student_study_year: int | None = None
+    student_gender: Gender | None = None
     hostel_name: str
     room_number: str
+    room_floor: int | None = None
+
+
+class HostelStudentProfile(BaseModel):
+    """Student profile details for hostel views."""
+    student_id: int
+    student_name: str
+    student_register_number: str | None = None
+    student_email: str | None = None
+    student_department: str | None = None
+    student_batch: str | None = None
+    student_degree: str | None = None
+    student_study_year: int | None = None
+    student_gender: Gender | None = None
+
+
+class HostelAssignmentRecommendation(BaseModel):
+    """Recommended assignment details."""
+    student_id: int
+    student_name: str
+    student_register_number: str | None = None
+    department: str | None = None
+    study_year: int | None = None
+    degree: str | None = None
+    batch: str | None = None
+    gender: Gender | None = None
+    hostel_id: int
+    room_id: int
+    room_number: str
+    room_floor: int | None = None
+    score: float
+
+
+class HostelAutoAssignSkip(BaseModel):
+    """Skipped student details for auto assignment."""
+    student_id: int
+    reason: str
+
+
+class HostelAutoAssignPreview(BaseModel):
+    """Auto-assign preview recommendations."""
+    hostel_id: int
+    recommended_count: int
+    skipped_count: int
+    recommendations: list[HostelAssignmentRecommendation]
+    skipped: list[HostelAutoAssignSkip]
+
+
+class HostelAutoAssignConfirmItem(BaseModel):
+    """Assignment item for confirmation."""
+    student_id: int
+    room_id: int
+
+
+class HostelAutoAssignConfirmRequest(BaseModel):
+    """Confirmation request payload."""
+    assignments: list[HostelAutoAssignConfirmItem]
+
+
+class HostelAutoAssignResult(BaseModel):
+    """Auto-assign result summary."""
+    hostel_id: int
+    assigned_count: int
+    skipped_count: int
+    assigned: list[HostelAssignmentWithDetails]
+    skipped: list[HostelAutoAssignSkip]
+    created_by_id: int | None = None
+    created_by_name: str | None = None
+    created_by_username: str | None = None
+    created_by_email: str | None = None
+    created_at: datetime | None = None
 
 
 class StudentHostelInfo(BaseModel):

@@ -18,6 +18,9 @@ interface UserData {
     register_number?: string;
     department?: string;
     batch?: string;
+    degree?: string;
+    study_year?: number;
+    gender?: string;
     student_category?: string;
 }
 
@@ -81,6 +84,9 @@ export default function AdminUsersPage() {
         register_number: '',
         department: '',
         batch: '',
+        degree: '',
+        study_year: '',
+        gender: '',
         student_category: ''
     });
 
@@ -97,6 +103,9 @@ export default function AdminUsersPage() {
             register_number: '',
             department: '',
             batch: '',
+            degree: '',
+            study_year: '',
+            gender: '',
             student_category: ''
         });
     };
@@ -113,6 +122,9 @@ export default function AdminUsersPage() {
             register_number: user.register_number || user.student_id || '',
             department: user.department || '',
             batch: user.batch || '',
+            degree: user.degree || '',
+            study_year: user.study_year ? String(user.study_year) : '',
+            gender: user.gender || '',
             student_category: user.student_category || ''
         });
         setShowModal(true);
@@ -160,6 +172,10 @@ export default function AdminUsersPage() {
             // Prepare payload
             const payload: any = { ...formData };
 
+            if (payload.study_year) {
+                payload.study_year = parseInt(payload.study_year, 10);
+            }
+
             // Remove empty password if editing (so it doesn't overwrite with empty string)
             if (editingUser && !payload.password) {
                 delete payload.password;
@@ -169,6 +185,9 @@ export default function AdminUsersPage() {
             if (!payload.register_number) delete payload.register_number;
             if (!payload.department) delete payload.department;
             if (!payload.batch) delete payload.batch;
+            if (!payload.degree) delete payload.degree;
+            if (!payload.study_year) delete payload.study_year;
+            if (!payload.gender) delete payload.gender;
             if (!payload.student_category) delete payload.student_category;
 
             if (editingUser) {
@@ -309,18 +328,44 @@ export default function AdminUsersPage() {
                                         value={formData.department}
                                         onChange={e => setFormData({ ...formData, department: e.target.value })}
                                     />
-                                    <input
-                                        type="text"
-                                        placeholder="Batch"
-                                        className="bg-slate-800 border border-slate-700 rounded-sm px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
-                                        value={formData.batch}
-                                        onChange={e => setFormData({ ...formData, batch: e.target.value })}
-                                    />
-                                    <select
-                                        className="bg-slate-800 border border-slate-700 rounded-sm px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
-                                        value={formData.student_category}
-                                        onChange={e => setFormData({ ...formData, student_category: e.target.value })}
-                                    >
+                                <input
+                                    type="text"
+                                    placeholder="Batch"
+                                    className="bg-slate-800 border border-slate-700 rounded-sm px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                                    value={formData.batch}
+                                    onChange={e => setFormData({ ...formData, batch: e.target.value })}
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Degree (e.g., BE, BSC)"
+                                    className="bg-slate-800 border border-slate-700 rounded-sm px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                                    value={formData.degree}
+                                    onChange={e => setFormData({ ...formData, degree: e.target.value })}
+                                />
+                                <input
+                                    type="number"
+                                    placeholder="Year (1-4)"
+                                    min={1}
+                                    max={8}
+                                    className="bg-slate-800 border border-slate-700 rounded-sm px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                                    value={formData.study_year}
+                                    onChange={e => setFormData({ ...formData, study_year: e.target.value })}
+                                />
+                                <select
+                                    className="bg-slate-800 border border-slate-700 rounded-sm px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                                    value={formData.gender}
+                                    onChange={e => setFormData({ ...formData, gender: e.target.value })}
+                                >
+                                    <option value="">Select Gender</option>
+                                    <option value="MALE">Male</option>
+                                    <option value="FEMALE">Female</option>
+                                    <option value="OTHER">Other</option>
+                                </select>
+                                <select
+                                    className="bg-slate-800 border border-slate-700 rounded-sm px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                                    value={formData.student_category}
+                                    onChange={e => setFormData({ ...formData, student_category: e.target.value })}
+                                >
                                         <option value="">Select Category</option>
                                         <option value="HOSTELLER">Hosteller</option>
                                         <option value="DAY_SCHOLAR">Day Scholar</option>

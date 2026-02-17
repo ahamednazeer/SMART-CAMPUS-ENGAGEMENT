@@ -1,6 +1,6 @@
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, field_validator
-from app.models.user import UserRole, StudentCategory
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from app.models.user import UserRole, StudentCategory, Gender
 
 
 class UserBase(BaseModel):
@@ -14,6 +14,9 @@ class UserBase(BaseModel):
     register_number: str | None = None
     department: str | None = None
     batch: str | None = None
+    degree: str | None = None
+    study_year: int | None = Field(default=None, ge=1, le=8)
+    gender: Gender | None = None
 
 
 class UserCreate(UserBase):
@@ -38,6 +41,9 @@ class UserUpdate(BaseModel):
     register_number: str | None = None
     department: str | None = None
     batch: str | None = None
+    degree: str | None = None
+    study_year: int | None = Field(default=None, ge=1, le=8)
+    gender: Gender | None = None
     is_active: bool | None = None
 
 

@@ -25,6 +25,7 @@ interface Hostel {
     id: number;
     name: string;
     address: string | null;
+    hostel_type: string;
     capacity: number;
     warden_id: number | null;
     is_active: boolean;
@@ -73,7 +74,7 @@ export default function AdminHostelsPage() {
     const [loadingRooms, setLoadingRooms] = useState(false);
 
     // Form states
-    const [hostelForm, setHostelForm] = useState({ name: '', address: '', capacity: 100 });
+    const [hostelForm, setHostelForm] = useState({ name: '', address: '', capacity: 100, hostel_type: 'CO_ED' });
     const [roomForm, setRoomForm] = useState({ room_number: '', floor: 0, capacity: 2 });
     const [assignForm, setAssignForm] = useState({ student_id: '', room_id: '' });
     const [wardenForm, setWardenForm] = useState({ warden_id: '' });
@@ -121,7 +122,7 @@ export default function AdminHostelsPage() {
             const data = await api.getUsers();
             // Filter to only show hostellers not assigned
             setUsers(data.users?.filter((u: User) =>
-                u.role === 'STUDENT' && u.student_category === 'HOSTELLER'
+                (u.role === 'STUDENT' || u.role === 'HOSTELLER') && u.student_category === 'HOSTELLER'
             ) || []);
         } catch (err: any) {
             console.error('Failed to load users:', err);
@@ -150,7 +151,7 @@ export default function AdminHostelsPage() {
         try {
             await api.createHostel(hostelForm);
             setShowHostelModal(false);
-            setHostelForm({ name: '', address: '', capacity: 100 });
+            setHostelForm({ name: '', address: '', capacity: 100, hostel_type: 'CO_ED' });
             await fetchHostels();
         } catch (err: any) {
             setFormError(err.message || 'Failed to create hostel');
@@ -309,6 +310,9 @@ export default function AdminHostelsPage() {
                                                 )}
                                             </h3>
                                             <p className="text-sm text-slate-500">{hostel.address || 'No address'}</p>
+                                            <p className="text-xs text-slate-600 uppercase tracking-wider">
+                                                {hostel.hostel_type?.replace('_', ' ') || 'CO ED'}
+                                            </p>
                                         </div>
                                     </div>
 
@@ -430,6 +434,18 @@ export default function AdminHostelsPage() {
                                     onChange={(e) => setHostelForm({ ...hostelForm, address: e.target.value })}
                                     className="w-full bg-slate-900/60 border border-slate-700/60 rounded-lg px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1">Hostel Type</label>
+                                <select
+                                    value={hostelForm.hostel_type}
+                                    onChange={(e) => setHostelForm({ ...hostelForm, hostel_type: e.target.value })}
+                                    className="w-full bg-slate-900/60 border border-slate-700/60 rounded-lg px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                                >
+                                    <option value="BOYS">Boys</option>
+                                    <option value="GIRLS">Girls</option>
+                                    <option value="CO_ED">Co-Ed</option>
+                                </select>
                             </div>
                             <div>
                                 <label className="block text-sm text-slate-400 mb-1">Capacity</label>

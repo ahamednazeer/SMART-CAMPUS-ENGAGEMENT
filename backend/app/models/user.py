@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import String, Boolean, Enum, DateTime, func
+from sqlalchemy import String, Boolean, Enum, DateTime, func, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 
@@ -20,6 +20,13 @@ class StudentCategory(str, enum.Enum):
     """Student category for streak rules."""
     HOSTELLER = "HOSTELLER"
     DAY_SCHOLAR = "DAY_SCHOLAR"
+
+
+class Gender(str, enum.Enum):
+    """Gender for hostel matching."""
+    MALE = "MALE"
+    FEMALE = "FEMALE"
+    OTHER = "OTHER"
 
 
 class User(Base):
@@ -44,6 +51,11 @@ class User(Base):
     register_number: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)
     department: Mapped[str | None] = mapped_column(String(100), nullable=True)
     batch: Mapped[str | None] = mapped_column(String(20), nullable=True)  # e.g., "2024"
+    degree: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g., "BE", "BSC"
+    study_year: Mapped[int | None] = mapped_column(Integer, nullable=True)  # e.g., 1, 2, 3, 4
+    gender: Mapped[Gender | None] = mapped_column(
+        Enum(Gender, native_enum=False), nullable=True
+    )
     
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     

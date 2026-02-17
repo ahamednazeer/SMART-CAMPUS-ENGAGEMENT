@@ -86,6 +86,74 @@ interface CertificateRequest {
     hostel_name: string | null;
 }
 
+interface AutoAssignPreview {
+    hostel_id: number;
+    recommended_count: number;
+    skipped_count: number;
+    recommendations: {
+        student_id: number;
+        student_name: string;
+        student_register_number: string | null;
+        department: string | null;
+        study_year: number | null;
+        degree: string | null;
+        batch: string | null;
+        gender: string | null;
+        hostel_id: number;
+        room_id: number;
+        room_number: string;
+        room_floor: number | null;
+        score: number;
+    }[];
+    skipped: { student_id: number; reason: string }[];
+}
+
+interface AutoAssignResult {
+    hostel_id: number;
+    assigned_count: number;
+    skipped_count: number;
+    created_by_id?: number | null;
+    created_by_name?: string | null;
+    created_by_username?: string | null;
+    created_by_email?: string | null;
+    created_at?: string | null;
+    assigned: {
+        student_id: number;
+        student_name: string;
+        student_register_number: string | null;
+        room_number: string;
+        room_floor: number | null;
+        assigned_at: string;
+    }[];
+    skipped: { student_id: number; reason: string }[];
+}
+
+interface HostelStudent {
+    student_id: number;
+    student_name: string;
+    student_register_number: string | null;
+    student_email: string | null;
+    student_department: string | null;
+    student_batch: string | null;
+    student_degree: string | null;
+    student_study_year: number | null;
+    student_gender: string | null;
+    room_number: string;
+    assigned_at: string;
+}
+
+interface UnassignedHosteller {
+    student_id: number;
+    student_name: string;
+    student_register_number: string | null;
+    student_email: string | null;
+    student_department: string | null;
+    student_batch: string | null;
+    student_degree: string | null;
+    student_study_year: number | null;
+    student_gender: string | null;
+}
+
 const CERTIFICATE_TYPES: Record<string, string> = {
     'HOSTEL_BONAFIDE': 'Hostel Bonafide',
     'STAY_CERTIFICATE': 'Stay Certificate',
@@ -130,13 +198,23 @@ export default function WardenDashboardPage() {
     const [upcomingOutpasses, setUpcomingOutpasses] = useState<OutpassWithStudent[]>([]);
 
     // Tab state
-    const [activeTab, setActiveTab] = useState<'pending' | 'active' | 'upcoming' | 'expired' | 'certificates'>('pending');
+    const [activeTab, setActiveTab] = useState<'pending' | 'active' | 'upcoming' | 'expired' | 'certificates' | 'students' | 'unassigned'>('pending');
 
     // Certificate state
     const [pendingCertificates, setPendingCertificates] = useState<CertificateRequest[]>([]);
     const [certProcessingId, setCertProcessingId] = useState<number | null>(null);
     const [certRejectModalId, setCertRejectModalId] = useState<number | null>(null);
     const [certRejectReason, setCertRejectReason] = useState('');
+    const [autoAssigning, setAutoAssigning] = useState(false);
+    const [autoAssignSummary, setAutoAssignSummary] = useState<string | null>(null);
+    const [autoAssignPreview, setAutoAssignPreview] = useState<AutoAssignPreview | null>(null);
+    const [showAutoAssignModal, setShowAutoAssignModal] = useState(false);
+    const [confirmingAutoAssign, setConfirmingAutoAssign] = useState(false);
+    const [lastAutoAssignResult, setLastAutoAssignResult] = useState<AutoAssignResult | null>(null);
+    const [hostelStudents, setHostelStudents] = useState<HostelStudent[]>([]);
+    const [loadingStudents, setLoadingStudents] = useState(false);
+    const [unassignedHostellers, setUnassignedHostellers] = useState<UnassignedHosteller[]>([]);
+    const [loadingUnassigned, setLoadingUnassigned] = useState(false);
 
     // Helper to check if outpass is currently active
     const isOutpassActive = (startDatetime: string, endDatetime: string) => {
@@ -164,19 +242,30 @@ export default function WardenDashboardPage() {
         fetchData();
     }, []);
 
+    useEffect(() => {
+        if (activeTab === 'students') {
+            fetchHostelStudents();
+        }
+        if (activeTab === 'unassigned') {
+            fetchUnassignedHostellers();
+        }
+    }, [activeTab]);
+
     async function fetchData() {
         setLoading(true);
         setError(null);
         try {
-            const [hostelData, pendingData, approvedData, certData] = await Promise.all([
+            const [hostelData, pendingData, approvedData, certData, latestAutoAssign] = await Promise.all([
                 api.getWardenHostel(),
                 api.getPendingOutpasses(),
                 api.getApprovedOutpasses ? api.getApprovedOutpasses() : Promise.resolve([]),
-                api.getPendingCertificates().catch(() => [])
+                api.getPendingCertificates().catch(() => []),
+                api.getLatestAutoAssignResult().catch(() => null)
             ]);
             setHostel(hostelData);
             setPendingOutpasses(pendingData || []);
             setPendingCertificates(certData || []);
+            setLastAutoAssignResult(latestAutoAssign || null);
 
             // Separate approved outpasses into active, upcoming, and expired
             const approved = approvedData || [];
@@ -204,6 +293,65 @@ export default function WardenDashboardPage() {
             setError(err.message || 'Failed to load data');
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function fetchHostelStudents() {
+        setLoadingStudents(true);
+        try {
+            const data = await api.getWardenStudents();
+            setHostelStudents(data || []);
+        } catch (err: any) {
+            console.error('Failed to load hostel students:', err);
+        } finally {
+            setLoadingStudents(false);
+        }
+    }
+
+    async function fetchUnassignedHostellers() {
+        setLoadingUnassigned(true);
+        try {
+            const data = await api.getWardenUnassignedHostellers();
+            setUnassignedHostellers(data || []);
+        } catch (err: any) {
+            console.error('Failed to load unassigned hostellers:', err);
+        } finally {
+            setLoadingUnassigned(false);
+        }
+    }
+
+    async function handleAutoAssign() {
+        setAutoAssigning(true);
+        setAutoAssignSummary(null);
+        try {
+            const result: AutoAssignPreview = await api.previewAutoAssignHostelRooms();
+            setAutoAssignPreview(result);
+            setShowAutoAssignModal(true);
+        } catch (err: any) {
+            alert(err.message || 'Failed to auto-assign students');
+        } finally {
+            setAutoAssigning(false);
+        }
+    }
+
+    async function handleConfirmAutoAssign() {
+        if (!autoAssignPreview) return;
+        setConfirmingAutoAssign(true);
+        try {
+            const assignments = autoAssignPreview.recommendations.map(rec => ({
+                student_id: rec.student_id,
+                room_id: rec.room_id,
+            }));
+            const result: AutoAssignResult = await api.confirmAutoAssignHostelRooms(assignments);
+            setLastAutoAssignResult(result);
+            setAutoAssignSummary(`Assigned ${result.assigned_count} student(s), skipped ${result.skipped_count}.`);
+            setShowAutoAssignModal(false);
+            setAutoAssignPreview(null);
+            await fetchData();
+        } catch (err: any) {
+            alert(err.message || 'Failed to confirm auto-assign');
+        } finally {
+            setConfirmingAutoAssign(false);
         }
     }
 
@@ -338,11 +486,28 @@ export default function WardenDashboardPage() {
                             </div>
                         </div>
                     </div>
+                    <div className="flex flex-col items-end gap-2">
+                        <button
+                            onClick={handleAutoAssign}
+                            disabled={autoAssigning}
+                            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white text-xs font-semibold uppercase tracking-wider px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                        >
+                            {autoAssigning ? (
+                                <div className="w-3 h-3 rounded-full border-2 border-indigo-200/40 border-t-white animate-spin" />
+                            ) : (
+                                <Sparkle size={14} weight="bold" />
+                            )}
+                            Generate Recommendations
+                        </button>
+                        {autoAssignSummary && (
+                            <p className="text-xs text-slate-400">{autoAssignSummary}</p>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* Stats - Clickable Tabs */}
-            <div className="grid grid-cols-5 gap-3">
+            <div className="grid grid-cols-7 gap-3">
                 <button
                     onClick={() => setActiveTab('pending')}
                     className={`bg-gradient-to-br from-yellow-900/40 to-yellow-950/60 border rounded-xl p-4 transition-all text-left hover:scale-[1.02] ${activeTab === 'pending'
@@ -420,6 +585,38 @@ export default function WardenDashboardPage() {
                     </div>
                     <p className="text-3xl font-mono font-bold text-slate-100">
                         {pendingCertificates.length}
+                    </p>
+                </button>
+
+                <button
+                    onClick={() => setActiveTab('students')}
+                    className={`bg-gradient-to-br from-indigo-900/40 to-indigo-950/60 border rounded-xl p-4 transition-all text-left hover:scale-[1.02] ${activeTab === 'students'
+                        ? 'border-indigo-500 ring-2 ring-indigo-500/30 shadow-lg shadow-indigo-900/20'
+                        : 'border-indigo-700/30 hover:border-indigo-600/50'
+                        }`}
+                >
+                    <div className="flex items-center gap-2 text-indigo-400 mb-2">
+                        <Users size={18} weight="duotone" />
+                        <span className="text-[10px] font-mono uppercase tracking-wider">Students</span>
+                    </div>
+                    <p className="text-3xl font-mono font-bold text-slate-100">
+                        {hostelStudents.length}
+                    </p>
+                </button>
+
+                <button
+                    onClick={() => setActiveTab('unassigned')}
+                    className={`bg-gradient-to-br from-cyan-900/40 to-cyan-950/60 border rounded-xl p-4 transition-all text-left hover:scale-[1.02] ${activeTab === 'unassigned'
+                        ? 'border-cyan-500 ring-2 ring-cyan-500/30 shadow-lg shadow-cyan-900/20'
+                        : 'border-cyan-700/30 hover:border-cyan-600/50'
+                        }`}
+                >
+                    <div className="flex items-center gap-2 text-cyan-400 mb-2">
+                        <Users size={18} weight="duotone" />
+                        <span className="text-[10px] font-mono uppercase tracking-wider">Unassigned</span>
+                    </div>
+                    <p className="text-3xl font-mono font-bold text-slate-100">
+                        {unassignedHostellers.length}
                     </p>
                 </button>
             </div>
@@ -831,6 +1028,171 @@ export default function WardenDashboardPage() {
                 </div>
             )}
 
+            {lastAutoAssignResult && (
+                <div className="bg-slate-900/60 border border-slate-700/60 rounded-xl p-5">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-sm font-mono text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <CheckCircle size={16} />
+                            Last Assignment Result
+                        </h2>
+                        <div className="text-xs text-slate-500">
+                            Assigned: {lastAutoAssignResult.assigned_count} • Skipped: {lastAutoAssignResult.skipped_count}
+                        </div>
+                    </div>
+                    <div className="text-xs text-slate-500 mb-3">
+                        {lastAutoAssignResult.created_by_name ? `Confirmed by ${lastAutoAssignResult.created_by_name}` : 'Confirmed by system'}
+                        {lastAutoAssignResult.created_by_username ? ` (${lastAutoAssignResult.created_by_username})` : ''}
+                        {lastAutoAssignResult.created_by_email ? ` • ${lastAutoAssignResult.created_by_email}` : ''}
+                        {' • '}
+                        {lastAutoAssignResult.created_at ? new Date(lastAutoAssignResult.created_at).toLocaleString() : 'Unknown time'}
+                    </div>
+                    {lastAutoAssignResult.assigned.length === 0 ? (
+                        <div className="text-slate-500 text-sm">No assignments were made.</div>
+                    ) : (
+                        <div className="overflow-x-auto border border-slate-800 rounded-lg">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-800/60 text-slate-400 uppercase text-xs">
+                                    <tr>
+                                        <th className="p-3">Student</th>
+                                        <th className="p-3">Reg No</th>
+                                        <th className="p-3">Room</th>
+                                        <th className="p-3">Floor</th>
+                                        <th className="p-3">Assigned At</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-700/60">
+                                    {lastAutoAssignResult.assigned.map((row) => (
+                                        <tr key={`${row.student_id}-${row.room_number}`} className="hover:bg-slate-800/40">
+                                            <td className="p-3 text-slate-200">{row.student_name}</td>
+                                            <td className="p-3 text-slate-400">{row.student_register_number || '-'}</td>
+                                            <td className="p-3 text-slate-200 font-mono">{row.room_number}</td>
+                                            <td className="p-3 text-slate-400">{row.room_floor ?? '-'}</td>
+                                            <td className="p-3 text-slate-500">{new Date(row.assigned_at).toLocaleString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Students Tab */}
+            {activeTab === 'students' && (
+                <div>
+                    <h2 className="text-lg font-chivo font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <Users size={20} className="text-indigo-400" />
+                        Hostel Students (Hostellers Only)
+                    </h2>
+
+                    {loadingStudents ? (
+                        <div className="bg-slate-800/40 border border-slate-700/60 rounded-lg p-8 text-center">
+                            <Pulse size={32} className="text-slate-500 mx-auto mb-2 animate-pulse" />
+                            <p className="text-slate-500">Loading students...</p>
+                        </div>
+                    ) : hostelStudents.length === 0 ? (
+                        <div className="bg-slate-800/40 border border-slate-700/60 rounded-lg p-8 text-center">
+                            <Users size={48} className="text-slate-600 mx-auto mb-4" />
+                            <h3 className="text-lg font-semibold text-slate-300 mb-2">No Students Assigned</h3>
+                            <p className="text-slate-500">There are no hostellers assigned to this hostel.</p>
+                        </div>
+                    ) : (
+                        <div className="bg-slate-800/40 border border-slate-700/60 rounded-lg overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-slate-900/60 text-slate-400 uppercase text-xs">
+                                        <tr>
+                                            <th className="p-3">Student</th>
+                                            <th className="p-3">Reg No</th>
+                                            <th className="p-3">Email</th>
+                                            <th className="p-3">Dept</th>
+                                            <th className="p-3">Year</th>
+                                            <th className="p-3">Degree</th>
+                                            <th className="p-3">Batch</th>
+                                            <th className="p-3">Gender</th>
+                                            <th className="p-3">Room</th>
+                                            <th className="p-3">Assigned</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-700/60">
+                                        {hostelStudents.map((student) => (
+                                            <tr key={student.student_id} className="hover:bg-slate-800/40">
+                                                <td className="p-3 text-slate-200">{student.student_name}</td>
+                                                <td className="p-3 text-slate-400">{student.student_register_number || '-'}</td>
+                                                <td className="p-3 text-slate-400">{student.student_email || '-'}</td>
+                                                <td className="p-3 text-slate-400">{student.student_department || '-'}</td>
+                                                <td className="p-3 text-slate-400">{student.student_study_year || '-'}</td>
+                                                <td className="p-3 text-slate-400">{student.student_degree || '-'}</td>
+                                                <td className="p-3 text-slate-400">{student.student_batch || '-'}</td>
+                                                <td className="p-3 text-slate-400">{student.student_gender || '-'}</td>
+                                                <td className="p-3 text-slate-200 font-mono">{student.room_number}</td>
+                                                <td className="p-3 text-slate-500">{formatDateTime(student.assigned_at)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Unassigned Hostellers Tab */}
+            {activeTab === 'unassigned' && (
+                <div>
+                    <h2 className="text-lg font-chivo font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <Users size={20} className="text-cyan-400" />
+                        Unassigned Hostellers (Eligible for This Hostel)
+                    </h2>
+
+                    {loadingUnassigned ? (
+                        <div className="bg-slate-800/40 border border-slate-700/60 rounded-lg p-8 text-center">
+                            <Pulse size={32} className="text-slate-500 mx-auto mb-2 animate-pulse" />
+                            <p className="text-slate-500">Loading hostellers...</p>
+                        </div>
+                    ) : unassignedHostellers.length === 0 ? (
+                        <div className="bg-slate-800/40 border border-slate-700/60 rounded-lg p-8 text-center">
+                            <Users size={48} className="text-slate-600 mx-auto mb-4" />
+                            <h3 className="text-lg font-semibold text-slate-300 mb-2">No Unassigned Hostellers</h3>
+                            <p className="text-slate-500">All eligible hostellers have been assigned.</p>
+                        </div>
+                    ) : (
+                        <div className="bg-slate-800/40 border border-slate-700/60 rounded-lg overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-slate-900/60 text-slate-400 uppercase text-xs">
+                                        <tr>
+                                            <th className="p-3">Student</th>
+                                            <th className="p-3">Reg No</th>
+                                            <th className="p-3">Email</th>
+                                            <th className="p-3">Dept</th>
+                                            <th className="p-3">Year</th>
+                                            <th className="p-3">Degree</th>
+                                            <th className="p-3">Batch</th>
+                                            <th className="p-3">Gender</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-700/60">
+                                        {unassignedHostellers.map((student) => (
+                                            <tr key={student.student_id} className="hover:bg-slate-800/40">
+                                                <td className="p-3 text-slate-200">{student.student_name}</td>
+                                                <td className="p-3 text-slate-400">{student.student_register_number || '-'}</td>
+                                                <td className="p-3 text-slate-400">{student.student_email || '-'}</td>
+                                                <td className="p-3 text-slate-400">{student.student_department || '-'}</td>
+                                                <td className="p-3 text-slate-400">{student.student_study_year || '-'}</td>
+                                                <td className="p-3 text-slate-400">{student.student_degree || '-'}</td>
+                                                <td className="p-3 text-slate-400">{student.student_batch || '-'}</td>
+                                                <td className="p-3 text-slate-400">{student.student_gender || '-'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Certificate Reject Modal */}
             {certRejectModalId && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -867,6 +1229,93 @@ export default function WardenDashboardPage() {
                                     <XCircle size={18} />
                                 )}
                                 Reject
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Auto-Assign Preview Modal */}
+            {showAutoAssignModal && autoAssignPreview && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-3xl w-full shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                                <Sparkle size={18} weight="duotone" className="text-indigo-400" />
+                                Auto-Assign Preview
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowAutoAssignModal(false);
+                                    setAutoAssignPreview(null);
+                                }}
+                                className="text-slate-400 hover:text-slate-200"
+                            >
+                                <XCircle size={20} />
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-slate-400 mb-4">
+                            <span>Recommended: <strong className="text-slate-200">{autoAssignPreview.recommended_count}</strong></span>
+                            <span>Skipped: <strong className="text-slate-200">{autoAssignPreview.skipped_count}</strong></span>
+                            <span className="text-xs uppercase tracking-wider text-slate-500">Hostellers only</span>
+                        </div>
+                        <div className="max-h-[360px] overflow-y-auto border border-slate-800 rounded-lg">
+                            {autoAssignPreview.recommendations.length === 0 ? (
+                                <div className="p-6 text-center text-slate-500">No recommendations available.</div>
+                            ) : (
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-slate-800/60 text-slate-400 uppercase text-xs">
+                                        <tr>
+                                            <th className="p-3">Student</th>
+                                            <th className="p-3">Reg No</th>
+                                            <th className="p-3">Dept</th>
+                                            <th className="p-3">Year</th>
+                                            <th className="p-3">Degree</th>
+                                        <th className="p-3">Batch</th>
+                                        <th className="p-3">Gender</th>
+                                        <th className="p-3">Room</th>
+                                        <th className="p-3">Floor</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800">
+                                    {autoAssignPreview.recommendations.map((rec) => (
+                                        <tr key={`${rec.student_id}-${rec.room_id}`} className="hover:bg-slate-800/40">
+                                                <td className="p-3 text-slate-200">{rec.student_name}</td>
+                                                <td className="p-3 text-slate-400">{rec.student_register_number || '-'}</td>
+                                                <td className="p-3 text-slate-400">{rec.department || '-'}</td>
+                                                <td className="p-3 text-slate-400">{rec.study_year || '-'}</td>
+                                                <td className="p-3 text-slate-400">{rec.degree || '-'}</td>
+                                            <td className="p-3 text-slate-400">{rec.batch || '-'}</td>
+                                            <td className="p-3 text-slate-400">{rec.gender || '-'}</td>
+                                            <td className="p-3 text-slate-200 font-mono">{rec.room_number}</td>
+                                            <td className="p-3 text-slate-400">{rec.room_floor ?? '-'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            )}
+                        </div>
+                        <div className="flex justify-end gap-3 mt-4">
+                            <button
+                                onClick={() => {
+                                    setShowAutoAssignModal(false);
+                                    setAutoAssignPreview(null);
+                                }}
+                                className="bg-slate-700 hover:bg-slate-600 text-slate-200 py-2 px-4 rounded-lg font-medium transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmAutoAssign}
+                                disabled={confirmingAutoAssign || autoAssignPreview.recommendations.length === 0}
+                                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-2 px-4 rounded-lg font-medium flex items-center gap-2 transition-colors"
+                            >
+                                {confirmingAutoAssign ? (
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <CheckCircle size={18} />
+                                )}
+                                Confirm Assignments
                             </button>
                         </div>
                     </div>

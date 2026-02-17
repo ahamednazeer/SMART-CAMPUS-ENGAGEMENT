@@ -635,6 +635,75 @@ class ApiClient {
         return this.request('/warden/students');
     }
 
+    async getWardenUnassignedHostellers() {
+        return this.request('/warden/hostel/unassigned-students');
+    }
+
+    async previewAutoAssignHostelRooms(params?: {
+        department?: string;
+        study_year?: number;
+        degree?: string;
+        gender?: string;
+        batch?: string;
+        limit?: number;
+        strategy?: 'fill' | 'spread';
+    }) {
+        const searchParams = new URLSearchParams();
+        if (params?.department) searchParams.set('department', params.department);
+        if (params?.study_year) searchParams.set('study_year', params.study_year.toString());
+        if (params?.degree) searchParams.set('degree', params.degree);
+        if (params?.gender) searchParams.set('gender', params.gender);
+        if (params?.batch) searchParams.set('batch', params.batch);
+        if (params?.limit) searchParams.set('limit', params.limit.toString());
+        if (params?.strategy) searchParams.set('strategy', params.strategy);
+        const query = searchParams.toString();
+        return this.request(`/warden/hostel/auto-assign${query ? `?${query}` : ''}`, {
+            method: 'POST',
+        });
+    }
+
+    async confirmAutoAssignHostelRooms(assignments: { student_id: number; room_id: number }[]) {
+        return this.request('/warden/hostel/auto-assign/confirm', {
+            method: 'POST',
+            body: JSON.stringify({ assignments }),
+        });
+    }
+
+    async getLatestAutoAssignResult() {
+        return this.request('/warden/hostel/auto-assign/latest');
+    }
+
+    async downloadHostelAssignments(format: 'excel' | 'pdf', params?: {
+        department?: string;
+        study_year?: number;
+        degree?: string;
+        gender?: string;
+        batch?: string;
+    }) {
+        const token = this.getToken();
+        const headers: Record<string, string> = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        const searchParams = new URLSearchParams();
+        searchParams.set('format', format);
+        if (params?.department) searchParams.set('department', params.department);
+        if (params?.study_year) searchParams.set('study_year', params.study_year.toString());
+        if (params?.degree) searchParams.set('degree', params.degree);
+        if (params?.gender) searchParams.set('gender', params.gender);
+        if (params?.batch) searchParams.set('batch', params.batch);
+        const response = await fetch(`${API_URL}/warden/hostel/assignments/export?${searchParams.toString()}`, {
+            method: 'GET',
+            headers,
+            cache: 'no-store',
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Download failed' }));
+            throw new Error(error.detail || error.message || 'Download failed');
+        }
+        return response.blob();
+    }
+
     async getPendingOutpasses(page: number = 1, pageSize: number = 20) {
         return this.request(`/warden/outpass/pending?page=${page}&page_size=${pageSize}`);
     }
@@ -667,7 +736,7 @@ class ApiClient {
     }
 
     // Admin - Hostel CRUD
-    async createHostel(data: { name: string; address?: string; capacity?: number }) {
+    async createHostel(data: { name: string; address?: string; capacity?: number; hostel_type?: string }) {
         return this.request('/admin/hostels', {
             method: 'POST',
             body: JSON.stringify(data),
@@ -1526,4 +1595,3 @@ class ApiClient {
 
 
 export const api = new ApiClient();
-

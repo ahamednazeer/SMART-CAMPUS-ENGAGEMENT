@@ -289,6 +289,10 @@ export default function StudentHostelPage() {
                                 <p className="text-slate-100 font-semibold">{hostelInfo.hostel_name}</p>
                             </div>
                             <div className="bg-slate-900/30 border border-indigo-700/20 rounded-lg p-3">
+                                <p className="text-[10px] text-slate-500 uppercase font-mono tracking-widest mb-1">Address</p>
+                                <p className="text-slate-100 font-semibold">{hostelInfo.hostel_address || 'Not available'}</p>
+                            </div>
+                            <div className="bg-slate-900/30 border border-indigo-700/20 rounded-lg p-3">
                                 <p className="text-[10px] text-slate-500 uppercase font-mono tracking-widest mb-1">Room</p>
                                 <p className="text-slate-100 font-semibold">{hostelInfo.room_number}</p>
                             </div>

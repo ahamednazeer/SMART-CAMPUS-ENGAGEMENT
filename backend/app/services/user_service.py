@@ -45,6 +45,9 @@ class UserService:
             register_number=data.register_number,
             department=data.department,
             batch=data.batch,
+            degree=data.degree,
+            study_year=data.study_year,
+            gender=data.gender,
         )
         
         user = await self.user_repo.create(user)

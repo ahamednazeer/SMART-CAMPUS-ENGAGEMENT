@@ -3,8 +3,8 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.hostel import Hostel, HostelRoom, HostelAssignment
-from app.models.user import User
+from app.models.hostel import Hostel, HostelRoom, HostelAssignment, HostelAssignmentBatch
+from app.models.user import User, UserRole, StudentCategory
 
 
 class HostelRepository:
@@ -15,9 +15,15 @@ class HostelRepository:
 
     # ==================== HOSTEL CRUD ====================
 
-    async def create_hostel(self, name: str, address: str | None = None, capacity: int = 100) -> Hostel:
+    async def create_hostel(
+        self,
+        name: str,
+        address: str | None = None,
+        capacity: int = 100,
+        hostel_type=None,
+    ) -> Hostel:
         """Create a new hostel."""
-        hostel = Hostel(name=name, address=address, capacity=capacity)
+        hostel = Hostel(name=name, address=address, capacity=capacity, hostel_type=hostel_type)
         self.db.add(hostel)
         await self.db.commit()
         await self.db.refresh(hostel)
@@ -120,6 +126,21 @@ class HostelRepository:
         )
         return result.scalar() or 0
 
+    async def get_room_occupants(self, hostel_id: int) -> dict[int, list[User]]:
+        """Get active occupants for rooms in a hostel."""
+        result = await self.db.execute(
+            select(HostelAssignment.room_id, User)
+            .join(User, User.id == HostelAssignment.student_id)
+            .where(
+                HostelAssignment.hostel_id == hostel_id,
+                HostelAssignment.is_active == True
+            )
+        )
+        occupants: dict[int, list[User]] = {}
+        for room_id, user in result.all():
+            occupants.setdefault(room_id, []).append(user)
+        return occupants
+
     # ==================== ASSIGNMENT CRUD ====================
 
     async def create_assignment(
@@ -178,6 +199,55 @@ class HostelRepository:
             .where(HostelAssignment.hostel_id == hostel_id, HostelAssignment.is_active == True)
         )
         return result.scalar() or 0
+
+    async def create_assignment_batch(
+        self,
+        hostel_id: int,
+        created_by: int | None,
+        assigned_count: int,
+        skipped_count: int,
+        assigned: list,
+        skipped: list,
+    ) -> HostelAssignmentBatch:
+        """Create a batch record for auto-assign confirmation."""
+        batch = HostelAssignmentBatch(
+            hostel_id=hostel_id,
+            created_by=created_by,
+            assigned_count=assigned_count,
+            skipped_count=skipped_count,
+            assigned=assigned,
+            skipped=skipped,
+        )
+        self.db.add(batch)
+        await self.db.commit()
+        await self.db.refresh(batch)
+        return batch
+
+    async def get_latest_assignment_batch(self, hostel_id: int) -> HostelAssignmentBatch | None:
+        """Get latest assignment batch for a hostel."""
+        result = await self.db.execute(
+            select(HostelAssignmentBatch)
+            .where(HostelAssignmentBatch.hostel_id == hostel_id)
+            .order_by(HostelAssignmentBatch.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_unassigned_hosteller_students(self) -> list[User]:
+        """Get all active hosteller students without an active assignment."""
+        assignment_exists = select(HostelAssignment.id).where(
+            HostelAssignment.student_id == User.id,
+            HostelAssignment.is_active == True
+        ).exists()
+        result = await self.db.execute(
+            select(User).where(
+                User.is_active == True,
+                User.student_category == StudentCategory.HOSTELLER,
+                User.role.in_([UserRole.STUDENT, UserRole.HOSTELLER]),
+                ~assignment_exists
+            ).order_by(User.department, User.study_year, User.degree, User.last_name)
+        )
+        return list(result.scalars().all())
 
     # ==================== HELPER METHODS ====================
 

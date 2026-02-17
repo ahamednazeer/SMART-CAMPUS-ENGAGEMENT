@@ -12,7 +12,7 @@ from app.models.attendance import (
     AttendanceRecord, AttendanceStatus,
     AttendanceAttempt, FailureReason
 )
-from app.models.hostel import Hostel, HostelRoom, HostelAssignment
+from app.models.hostel import Hostel, HostelRoom, HostelAssignment, HostelAssignmentBatch
 from app.models.outpass import OutpassRequest, OutpassStatus, OutpassLog
 from app.models.maintenance import HostelMaintenance, MaintenanceCategory, MaintenanceStatus
 from app.models.bonafide import BonafideCertificate, CertificateType, CertificatePurpose, CertificateStatus
@@ -88,6 +88,7 @@ __all__ = [
     "Hostel",
     "HostelRoom",
     "HostelAssignment",
+    "HostelAssignmentBatch",
     # Outpass
     "OutpassRequest",
     "OutpassStatus",

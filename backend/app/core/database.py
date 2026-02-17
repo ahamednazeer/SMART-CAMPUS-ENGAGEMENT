@@ -8,6 +8,8 @@ engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,  # Disable SQL logging to reduce verbosity
     future=True,
+    pool_pre_ping=True,
+    pool_recycle=1800,
 )
 
 # Session factory
