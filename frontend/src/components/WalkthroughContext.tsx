@@ -41,18 +41,18 @@ const walkthroughSteps: WalkthroughStep[] = [
         description: 'View your attendance summary here. You can see present days, absent days, and your overall attendance percentage.',
         position: 'top',
     },
-    {
-        id: 'quizzes',
-        targetSelector: '[data-walkthrough="quizzes"]',
-        title: 'Quiz Results',
-        description: 'Track your quiz performance. See recent attempts and scores at a glance.',
-        position: 'top',
-    },
+    // {
+    //     id: 'quizzes',
+    //     targetSelector: '[data-walkthrough="quizzes"]',
+    //     title: 'Quiz Results',
+    //     description: 'Track your quiz performance. See recent attempts and scores at a glance.',
+    //     position: 'top',
+    // },
     {
         id: 'quick-actions',
         targetSelector: '[data-walkthrough="quick-actions"]',
         title: 'Quick Actions',
-        description: 'Access all features quickly! From learning hub to attendance, quizzes, faculty locator, and more.',
+        description: 'Access all features quickly! From attendance to queries and complaints.',
         position: 'top',
     },
     {
@@ -66,7 +66,7 @@ const walkthroughSteps: WalkthroughStep[] = [
         id: 'ai-assistant',
         targetSelector: '[data-walkthrough="ai-assistant"]',
         title: 'AI Assistant 🤖',
-        description: 'Need help? Click here to chat with our AI assistant anytime. Ask questions about your courses, attendance, or campus services!',
+        description: 'Need help? Click here to chat with our AI assistant anytime. Ask questions about your hostel, attendance, or campus services!',
         position: 'left',
     },
 ];

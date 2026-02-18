@@ -55,14 +55,14 @@ const menuItemsByRole: Record<string, MenuItem[]> = {
         { icon: Gauge, label: 'Overview', path: '/admin' },
         { icon: Users, label: 'Users', path: '/admin/users' },
         // { icon: FileText, label: 'PDFs', path: '/admin/pdfs' }, // COMMENTED OUT - PDF feature disabled
-        { icon: Question, label: 'Quizzes', path: '/admin/quizzes' },
-        { icon: Trophy, label: 'Quiz Results', path: '/admin/results' },
+        // { icon: Question, label: 'Quizzes', path: '/admin/quizzes' },
+        // { icon: Trophy, label: 'Quiz Results', path: '/admin/results' },
         // { icon: Fire, label: 'Streaks', path: '/admin/streaks' }, // COMMENTED OUT - Reading Streak feature disabled
         { icon: MapPin, label: 'Attendance', path: '/admin/attendance' },
         { icon: Buildings, label: 'Hostels', path: '/admin/hostels' },
         { icon: Certificate, label: 'Certificates', path: '/admin/certificates' },
         { icon: ClipboardText, label: 'Audit Logs', path: '/admin/audit' },
-        { icon: Users, label: 'Faculty Locations', path: '/admin/faculty-locations' },
+        // { icon: Users, label: 'Faculty Locations', path: '/admin/faculty-locations' },
         { icon: ChatCircle, label: 'Queries', path: '/admin/queries' },
         { icon: Wrench, label: 'Complaints', path: '/admin/complaints' },
     ],
@@ -75,10 +75,10 @@ const menuItemsByRole: Record<string, MenuItem[]> = {
     STUDENT: [
         { icon: Gauge, label: 'Overview', path: '/dashboard/student' },
         // { icon: Books, label: 'My PDFs', path: '/dashboard/student/pdfs' }, // COMMENTED OUT - PDF feature disabled
-        { icon: Question, label: 'Quizzes', path: '/dashboard/student/quizzes' },
+        // { icon: Question, label: 'Quizzes', path: '/dashboard/student/quizzes' },
         // { icon: Fire, label: 'My Streak', path: '/dashboard/student/streak' }, // COMMENTED OUT - Reading Streak feature disabled
         { icon: MapPin, label: 'Attendance', path: '/dashboard/student/attendance' },
-        { icon: Users, label: 'Faculty Locator', path: '/dashboard/student/faculty' },
+        // { icon: Users, label: 'Faculty Locator', path: '/dashboard/student/faculty' },
         { icon: ChatCircle, label: 'Queries', path: '/dashboard/student/queries' },
         { icon: Wrench, label: 'Complaints', path: '/dashboard/student/complaints' },
         { icon: Users, label: 'Profile', path: '/dashboard/student/profile' },
@@ -86,11 +86,11 @@ const menuItemsByRole: Record<string, MenuItem[]> = {
     HOSTELLER: [
         { icon: Gauge, label: 'Overview', path: '/dashboard/student' },
         // { icon: Books, label: 'My PDFs', path: '/dashboard/student/pdfs' }, // COMMENTED OUT - PDF feature disabled
-        { icon: Question, label: 'Quizzes', path: '/dashboard/student/quizzes' },
+        // { icon: Question, label: 'Quizzes', path: '/dashboard/student/quizzes' },
         // { icon: Fire, label: 'My Streak', path: '/dashboard/student/streak' }, // COMMENTED OUT - Reading Streak feature disabled
         { icon: MapPin, label: 'Attendance', path: '/dashboard/student/attendance' },
         { icon: Buildings, label: 'Hostel', path: '/dashboard/student/hostel' },
-        { icon: Users, label: 'Faculty Locator', path: '/dashboard/student/faculty' },
+        // { icon: Users, label: 'Faculty Locator', path: '/dashboard/student/faculty' },
         { icon: ChatCircle, label: 'Queries', path: '/dashboard/student/queries' },
         { icon: Wrench, label: 'Complaints', path: '/dashboard/student/complaints' },
         { icon: Users, label: 'Profile', path: '/dashboard/student/profile' },
@@ -98,10 +98,10 @@ const menuItemsByRole: Record<string, MenuItem[]> = {
     DAY_SCHOLAR: [
         { icon: Gauge, label: 'Overview', path: '/dashboard/student' },
         // { icon: Books, label: 'My PDFs', path: '/dashboard/student/pdfs' }, // COMMENTED OUT - PDF feature disabled
-        { icon: Question, label: 'Quizzes', path: '/dashboard/student/quizzes' },
+        // { icon: Question, label: 'Quizzes', path: '/dashboard/student/quizzes' },
         // { icon: Fire, label: 'My Streak', path: '/dashboard/student/streak' }, // COMMENTED OUT - Reading Streak feature disabled
         { icon: MapPin, label: 'Attendance', path: '/dashboard/student/attendance' },
-        { icon: Users, label: 'Faculty Locator', path: '/dashboard/student/faculty' },
+        // { icon: Users, label: 'Faculty Locator', path: '/dashboard/student/faculty' },
         { icon: Certificate, label: 'Certificates', path: '/dashboard/student/certificates' },
         { icon: ChatCircle, label: 'Queries', path: '/dashboard/student/queries' },
         { icon: Wrench, label: 'Complaints', path: '/dashboard/student/complaints' },
@@ -110,8 +110,8 @@ const menuItemsByRole: Record<string, MenuItem[]> = {
     STAFF: [
         { icon: Gauge, label: 'Overview', path: '/dashboard/staff' },
         { icon: MapPin, label: 'Availability', path: '/dashboard/staff/availability' },
-        { icon: Books, label: 'Learning Hub', path: '/dashboard/staff/learning' },
-        { icon: ChatCircle, label: 'Study Circles', path: '/dashboard/student/learning/circles' },
+        // { icon: Books, label: 'Learning Hub', path: '/dashboard/staff/learning' },
+        // { icon: ChatCircle, label: 'Study Circles', path: '/dashboard/student/learning/circles' },
     ],
 };
 

@@ -124,6 +124,7 @@ export default function AdminDashboard() {
                         >
                             Manage Users
                         </button>
+                        {/* 
                         <button
                             onClick={() => window.location.href = '/admin/pdfs'}
                             className="bg-gradient-to-br from-purple-900/40 to-purple-950/60 border border-purple-700/30 hover:border-purple-600/50 rounded-xl px-4 py-3 text-purple-300 font-bold text-sm uppercase tracking-wider transition-all hover:scale-[1.02]"
@@ -136,6 +137,7 @@ export default function AdminDashboard() {
                         >
                             Create Quiz
                         </button>
+                        */}
                         {/* COMMENTED OUT - Reading Streak feature disabled
                         <button
                             onClick={() => window.location.href = '/admin/streaks'}

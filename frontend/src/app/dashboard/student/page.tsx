@@ -127,21 +127,7 @@ export default function StudentDashboardPage() {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <DataCard
-                    title="Quizzes Taken"
-                    value={totalQuizzes}
-                    icon={Question}
-                />
-                <DataCard
-                    title="Quizzes Passed"
-                    value={passedQuizzes}
-                    icon={Trophy}
-                />
-                <DataCard
-                    title="Average Score"
-                    value={`${averageScore.toFixed(0)}%`}
-                    icon={ChartLineUp}
-                />
+                {/* Quiz stats removed */}
                 <DataCard
                     title="Attendance Rate"
                     value={`${attendanceStats?.attendance_percentage?.toFixed(0) || 0}%`}
@@ -176,44 +162,7 @@ export default function StudentDashboardPage() {
                     </Link>
                 </div>
 
-                {/* Recent Quiz Attempts */}
-                <div data-walkthrough="quizzes" className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-6 relative overflow-hidden">
-                    <Sparkle size={80} weight="duotone" className="absolute -right-4 -top-4 text-slate-700/20" />
-                    <h3 className="text-sm font-mono text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
-                        <Trophy size={16} weight="duotone" />
-                        Recent Quiz Results
-                    </h3>
-                    {recentAttempts.length > 0 ? (
-                        <div className="space-y-2 relative z-10">
-                            {recentAttempts.map((attempt) => (
-                                <div key={attempt.id} className="flex items-center justify-between p-3 bg-slate-900/50 border border-slate-800/50 rounded-xl">
-                                    <div className="flex items-center gap-3">
-                                        {attempt.passed ? (
-                                            <CheckCircle size={18} weight="duotone" className="text-green-400" />
-                                        ) : (
-                                            <XCircle size={18} weight="duotone" className="text-red-400" />
-                                        )}
-                                        <span className="text-slate-300 text-sm truncate max-w-[150px]">{attempt.quiz_title}</span>
-                                    </div>
-                                    <div className={`font-mono font-bold text-sm ${attempt.passed ? 'text-green-400' : 'text-red-400'}`}>
-                                        {attempt.score}%
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-8 relative z-10">
-                            <Star size={48} weight="duotone" className="text-slate-600 mx-auto mb-3" />
-                            <p className="text-slate-500 text-sm">No quizzes attempted yet</p>
-                        </div>
-                    )}
-                    <Link
-                        href="/dashboard/student/quizzes"
-                        className="mt-4 flex items-center justify-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors"
-                    >
-                        Take a Quiz <ArrowRight size={16} />
-                    </Link>
-                </div>
+                {/* Recent Quiz Results removed */}
             </div>
 
             {/* Quick Actions */}
@@ -224,21 +173,7 @@ export default function StudentDashboardPage() {
                     Quick Actions
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10">
-                    <Link
-                        href="/dashboard/student/learning"
-                        className="flex items-center justify-between p-4 bg-gradient-to-br from-purple-950/30 to-indigo-900/10 border border-purple-700/30 rounded-xl hover:border-purple-500/50 transition-all group sm:col-span-2 lg:col-span-1"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-purple-900/40 rounded-xl">
-                                <Brain size={24} weight="duotone" className="text-purple-400" />
-                            </div>
-                            <div>
-                                <span className="text-slate-200 font-bold block">Learning Hub</span>
-                                <span className="text-xs text-slate-500">Circles, Battles & More</span>
-                            </div>
-                        </div>
-                        <ArrowRight size={20} className="text-slate-600 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
-                    </Link>
+                    {/* Learning Hub removed */}
                     <Link
                         href="/dashboard/student/attendance"
                         className="flex items-center justify-between p-4 bg-gradient-to-br from-blue-950/30 to-blue-900/10 border border-blue-700/30 rounded-xl hover:border-blue-500/50 transition-all group"
@@ -254,36 +189,8 @@ export default function StudentDashboardPage() {
                         </div>
                         <ArrowRight size={20} className="text-slate-600 group-hover:text-blue-400 group-hover:translate-x-1 transition-all" />
                     </Link>
-                    <Link
-                        href="/dashboard/student/quizzes"
-                        className="flex items-center justify-between p-4 bg-gradient-to-br from-purple-950/30 to-purple-900/10 border border-purple-700/30 rounded-xl hover:border-purple-500/50 transition-all group"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-purple-900/40 rounded-xl">
-                                <Question size={24} weight="duotone" className="text-purple-400" />
-                            </div>
-                            <div>
-                                <span className="text-slate-200 font-bold block">Quizzes</span>
-                                <span className="text-xs text-slate-500">Test your knowledge</span>
-                            </div>
-                        </div>
-                        <ArrowRight size={20} className="text-slate-600 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
-                    </Link>
-                    <Link
-                        href="/dashboard/student/faculty"
-                        className="flex items-center justify-between p-4 bg-gradient-to-br from-cyan-950/30 to-cyan-900/10 border border-cyan-700/30 rounded-xl hover:border-cyan-500/50 transition-all group"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-cyan-900/40 rounded-xl">
-                                <Users size={24} weight="duotone" className="text-cyan-400" />
-                            </div>
-                            <div>
-                                <span className="text-slate-200 font-bold block">Faculty Locator</span>
-                                <span className="text-xs text-slate-500">Find professors</span>
-                            </div>
-                        </div>
-                        <ArrowRight size={20} className="text-slate-600 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
-                    </Link>
+                    {/* Quizzes removed */}
+                    {/* Faculty Locator removed */}
                     <Link
                         href="/dashboard/student/queries"
                         className="flex items-center justify-between p-4 bg-gradient-to-br from-green-950/30 to-green-900/10 border border-green-700/30 rounded-xl hover:border-green-500/50 transition-all group"
