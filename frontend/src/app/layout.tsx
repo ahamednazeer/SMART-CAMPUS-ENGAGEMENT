@@ -9,13 +9,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-    title: "Institution Mangement System Engagement",
-    description: "Campus learning and engagement platform with reading streaks and quizzes",
+    title: "Hostel Management System",
+    description: "Hostel management platform with attendance tracking and student services",
     manifest: "/manifest.json",
     appleWebApp: {
         capable: true,
         statusBarStyle: "default",
-        title: "Institution Mangement System",
+        title: "Hostel Management System",
     },
 };
 

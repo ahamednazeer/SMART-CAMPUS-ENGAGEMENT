@@ -1,6 +1,6 @@
-# Institution Mangement System Engagement System
+# Hostel Management System
 
-A comprehensive campus management and engagement platform featuring AI-powered quiz generation, attendance tracking, query management, maintenance complaints, and more.
+A comprehensive hostel management platform featuring AI-powered quiz generation, attendance tracking, query management, maintenance complaints, and more.
 
 ## Architecture
 - **Frontend**: Next.js 16 (React 19), Tailwind CSS
@@ -48,7 +48,7 @@ The system requires an LLM for AI quizzes, assistant, and categorization. You ca
 ## 3. Database Setup (PostgreSQL)
 1. **Create Database**:
    ```sql
-   CREATE DATABASE smart_campus;
+   CREATE DATABASE hostel_management;
    ```
 2. **Note**: The system uses `asyncpg`, so ensure your connection string uses `postgresql+asyncpg://`.
 
@@ -98,7 +98,7 @@ The system requires an LLM for AI quizzes, assistant, and categorization. You ca
 ## 🔑 Default Credentials
 After setup, log in at [http://localhost:3000](http://localhost:3000):
 - **Role**: Admin
-- **Email**: `admin@campus.edu`
+- **Email**: `admin@hostel.edu`
 - **Username**: `admin`
 - **Password**: `admin123`
 
@@ -117,5 +117,4 @@ After setup, log in at [http://localhost:3000](http://localhost:3000):
 └── DEMO_GUIDE.md       # Feature walk-through guide
 ```
 
-From: https://github.com/serengil/deepface_models/releases/download/v1.0/vgg_face_weights.h5
 

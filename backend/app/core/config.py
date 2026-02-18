@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/smart_campus"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/hostel_management"
     
     # JWT Settings
     JWT_SECRET_KEY: str = "your-super-secret-key-change-in-production"
@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
     
     # App Settings
-    APP_NAME: str = "Institution Mangement System Engagement"
+    APP_NAME: str = "Hostel Management"
     DEBUG: bool = True
     
     # File Upload

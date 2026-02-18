@@ -100,7 +100,7 @@ export default function StudentSessionRoomPage() {
 
         loadJitsiScript().then(() => {
             const domain = '8x8.vc';
-            const roomName = `vpaas-magic-cookie-68b8aa6f9d0f4538953b86d65c058184/SmartCampusDoubt${sessionId}`;
+            const roomName = `vpaas-magic-cookie-68b8aa6f9d0f4538953b86d65c058184/HostelMgmtDoubt${sessionId}`;
 
             const options = {
                 roomName: roomName,
@@ -253,7 +253,7 @@ export default function StudentSessionRoomPage() {
                             <X className="w-4 h-4" />
                         </button>
                         <iframe
-                            src={`https://excalidraw.com/#room=SmartCampus${sessionId},SmartCampusKey${String(sessionId).padStart(8, '0')}`}
+                            src={`https://excalidraw.com/#room=HostelMgmt${sessionId},HostelMgmtKey${String(sessionId).padStart(8, '0')}`}
                             className="w-full h-full border-0"
                             title="Whiteboard"
                             allow="clipboard-read; clipboard-write"

@@ -216,7 +216,7 @@ export default function CertificateViewPage() {
                             <GraduationCap size={48} className="text-indigo-700" weight="fill" />
                             <div>
                                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-wide">
-                                    Institution Mangement System
+                                    Hostel Management System
                                 </h1>
                                 <p className="text-slate-600 text-sm">Excellence in Education</p>
                             </div>

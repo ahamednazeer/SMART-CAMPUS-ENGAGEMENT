@@ -237,7 +237,7 @@ export default function OfflinePage() {
                     Retry Connection
                 </button>
 
-                <p className="text-center text-xs text-slate-600 uppercase tracking-widest font-mono mt-8">Institution Mangement System</p>
+                <p className="text-center text-xs text-slate-600 uppercase tracking-widest font-mono mt-8">Hostel Management System</p>
             </div>
 
             {/* Digital Outpass Modal */}
@@ -275,7 +275,7 @@ export default function OfflinePage() {
                             <div className={`py-4 px-5 text-center border-b-2 border-dashed ${isExpired ? 'bg-gradient-to-r from-red-700 to-red-600' : 'bg-gradient-to-r from-green-700 to-green-600'}`}>
                                 <div className="flex items-center justify-center gap-2 mb-1">
                                     <Buildings size={20} className="text-white/80" />
-                                    <span className="text-white/80 text-xs font-semibold uppercase tracking-widest">Institution Mangement System</span>
+                                    <span className="text-white/80 text-xs font-semibold uppercase tracking-widest">Hostel Management System</span>
                                 </div>
                                 <h1 className="text-white font-bold text-lg uppercase tracking-wide">HOSTEL DIGITAL OUTPASS</h1>
                                 <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold mt-1 ${isExpired ? 'bg-red-900/50 text-red-200' : 'bg-green-900/50 text-green-200'}`}>

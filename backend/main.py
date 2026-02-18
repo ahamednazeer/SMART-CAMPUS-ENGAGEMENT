@@ -85,7 +85,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Institution Mangement System Engagement System API",
+    description="Hostel Management System API",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -145,7 +145,7 @@ app.mount("/static", StaticFiles(directory=settings.UPLOAD_DIR), name="static")
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {"message": "Institution Mangement System Engagement System API", "version": "1.0.0"}
+    return {"message": "Hostel Management System API", "version": "1.0.0"}
 
 
 @app.get("/health")
@@ -169,7 +169,7 @@ async def create_default_admin():
         if admin is None:
             admin = User(
                 username="admin",
-                email="admin@campus.edu",
+                email="admin@hostel.edu",
                 password_hash=hash_password("admin123"),
                 first_name="System",
                 last_name="Admin",

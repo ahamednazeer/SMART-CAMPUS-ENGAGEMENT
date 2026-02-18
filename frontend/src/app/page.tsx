@@ -106,9 +106,9 @@ export default function LoginPage() {
                     <div className="flex flex-col items-center mb-8">
                         <GraduationCap size={48} weight="duotone" className="text-blue-400 mb-4" />
                         <h1 className="text-3xl font-chivo font-bold uppercase tracking-wider text-center">
-                            Institution Mangement System
+                            Hostel Management System
                         </h1>
-                        <p className="text-slate-400 text-sm mt-2">Learning & Engagement Platform</p>
+                        <p className="text-slate-400 text-sm mt-2">Hostel & Student Engagement Platform</p>
                     </div>
 
                     {error && (

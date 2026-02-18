@@ -1,7 +1,7 @@
 {
-    "name": "Institution Mangement System",
-    "short_name": "SmartCampus",
-    "description": "Institution Mangement System Engagement Platform - Student Portal",
+    "name": "Hostel Management System",
+    "short_name": "HostelMgmt",
+    "description": "Hostel Management System - Student Portal",
     "theme_color": "#0f172a",
     "background_color": "#0f172a",
     "display": "standalone",

@@ -23,14 +23,14 @@ interface WalkthroughContextType {
     hasCompletedWalkthrough: boolean;
 }
 
-const STORAGE_KEY = 'smart-campus-walkthrough-completed';
+const STORAGE_KEY = 'hostel-management-walkthrough-completed';
 
 // Walkthrough steps for student dashboard
 const walkthroughSteps: WalkthroughStep[] = [
     {
         id: 'welcome',
         targetSelector: '[data-walkthrough="header"]',
-        title: 'Welcome to Smart Campus! 🎓',
+        title: 'Welcome to Hostel Management! 🎓',
         description: 'This is your personal dashboard. Let\'s take a quick tour to help you get started.',
         position: 'bottom',
     },
