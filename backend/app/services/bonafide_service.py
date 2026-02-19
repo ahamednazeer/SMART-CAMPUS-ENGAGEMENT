@@ -91,30 +91,53 @@ class BonafideCertificateService:
         summary = await self.repo.get_student_summary(student_id)
         return CertificateSummary(**summary)
 
-    async def get_pending_for_warden(self, warden_id: int) -> List[CertificateWithDetails]:
-        """Get pending certificate requests for warden's hostel"""
-        # Get warden's hostel
-        hostel = await self.hostel_repo.get_warden_hostel(warden_id)
-        if not hostel:
+    async def get_pending_for_warden(
+        self, warden_id: int, hostel_id: int | None = None
+    ) -> List[CertificateWithDetails]:
+        """Get pending certificate requests for all hostels managed by warden"""
+        hostel_ids = await self._get_warden_hostel_ids(warden_id, hostel_id)
+        if not hostel_ids:
             return []
 
-        certificates = await self.repo.get_pending_for_hostel(hostel.id)
+        certificates: List[BonafideCertificate] = []
+        for hostel_id in hostel_ids:
+            pending = await self.repo.get_pending_for_hostel(hostel_id)
+            certificates.extend(pending)
+
+        certificates.sort(key=lambda cert: cert.created_at)
         return await self._enrich_certificates(certificates)
 
     async def get_hostel_certificates(
         self,
         warden_id: int,
+        hostel_id: int | None = None,
         status: Optional[CertificateStatus] = None,
         page: int = 1,
         page_size: int = 20
     ) -> tuple[List[CertificateWithDetails], int]:
-        """Get all certificates for warden's hostel"""
-        # Get warden's hostel
-        hostel = await self.hostel_repo.get_warden_hostel(warden_id)
-        if not hostel:
+        """Get all certificates for all hostels managed by warden"""
+        hostel_ids = await self._get_warden_hostel_ids(warden_id, hostel_id)
+        if not hostel_ids:
             return [], 0
 
-        certificates, total = await self.repo.get_by_hostel(hostel.id, status, page, page_size)
+        from sqlalchemy import select, func
+        query = select(BonafideCertificate).where(BonafideCertificate.hostel_id.in_(hostel_ids))
+        count_query = select(func.count(BonafideCertificate.id)).where(
+            BonafideCertificate.hostel_id.in_(hostel_ids)
+        )
+        if status:
+            query = query.where(BonafideCertificate.status == status)
+            count_query = count_query.where(BonafideCertificate.status == status)
+
+        total_result = await self.db.execute(count_query)
+        total = total_result.scalar() or 0
+        offset = (page - 1) * page_size
+        result = await self.db.execute(
+            query.order_by(BonafideCertificate.created_at.desc())
+            .offset(offset)
+            .limit(page_size)
+        )
+        certificates = list(result.scalars().all())
         enriched = await self._enrich_certificates(certificates)
         return enriched, total
 
@@ -128,9 +151,9 @@ class BonafideCertificateService:
         if not certificate:
             raise ValueError("Certificate not found")
 
-        # Verify warden owns the hostel
-        hostel = await self.hostel_repo.get_warden_hostel(warden_id)
-        if not hostel or hostel.id != certificate.hostel_id:
+        # Verify warden manages the certificate hostel
+        hostel_ids = set(await self._get_warden_hostel_ids(warden_id))
+        if certificate.hostel_id not in hostel_ids:
             raise ValueError("Unauthorized to approve this certificate")
 
         # Check status
@@ -138,7 +161,7 @@ class BonafideCertificateService:
             raise ValueError(f"Cannot approve certificate with status {certificate.status}")
 
         # Generate certificate number
-        cert_number = await self.repo.generate_certificate_number(hostel.id)
+        cert_number = await self.repo.generate_certificate_number(certificate.hostel_id)
 
         # Update status
         updated = await self.repo.update_status(
@@ -161,9 +184,9 @@ class BonafideCertificateService:
         if not certificate:
             raise ValueError("Certificate not found")
 
-        # Verify warden owns the hostel
-        hostel = await self.hostel_repo.get_warden_hostel(warden_id)
-        if not hostel or hostel.id != certificate.hostel_id:
+        # Verify warden manages the certificate hostel
+        hostel_ids = set(await self._get_warden_hostel_ids(warden_id))
+        if certificate.hostel_id not in hostel_ids:
             raise ValueError("Unauthorized to reject this certificate")
 
         # Check status
@@ -179,6 +202,18 @@ class BonafideCertificateService:
         )
 
         return CertificateOut.model_validate(updated) if updated else None
+
+    async def _get_warden_hostel_ids(
+        self, warden_id: int, hostel_id: int | None = None
+    ) -> list[int]:
+        """Get all active hostel IDs managed by a warden."""
+        hostels = await self.hostel_repo.get_warden_hostels(warden_id)
+        hostel_ids = [hostel.id for hostel in hostels]
+        if hostel_id is None:
+            return hostel_ids
+        if hostel_id not in hostel_ids:
+            raise PermissionError("Unauthorized hostel access")
+        return [hostel_id]
 
     async def get_certificate_for_download(
         self,
@@ -296,4 +331,3 @@ class BonafideCertificateService:
         )
 
         return CertificateOut.model_validate(updated) if updated else None
-

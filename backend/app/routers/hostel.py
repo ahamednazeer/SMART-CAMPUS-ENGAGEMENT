@@ -155,6 +155,16 @@ async def update_room(
 
 # ==================== STUDENT ASSIGNMENTS ====================
 
+@router.get("/assignments/all", response_model=list[HostelAssignmentWithDetails])
+async def get_all_active_assignments(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[User, Depends(require_admin)]
+):
+    """Get all active hostel assignments across all hostels (Admin only)."""
+    service = HostelService(db)
+    return await service.get_all_active_assignments()
+
+
 @router.post("/assignments", response_model=HostelAssignmentOut, status_code=status.HTTP_201_CREATED)
 async def assign_student(
     data: HostelAssignmentCreate,

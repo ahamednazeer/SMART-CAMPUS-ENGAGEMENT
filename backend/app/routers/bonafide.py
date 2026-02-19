@@ -2,7 +2,7 @@
 API router for Bonafide Certificate endpoints.
 Handles student requests and warden approvals.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -132,16 +132,21 @@ async def download_certificate(
 
 @router.get("/warden/pending", response_model=list[CertificateWithDetails])
 async def get_pending_certificates(
+    hostel_id: int | None = Query(None),
     current_user: User = Depends(require_warden),
     db: AsyncSession = Depends(get_db)
 ):
     """Get pending certificate requests for warden's hostel"""
     service = BonafideCertificateService(db)
-    return await service.get_pending_for_warden(current_user.id)
+    try:
+        return await service.get_pending_for_warden(current_user.id, hostel_id)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 @router.get("/warden/all", response_model=CertificateListOut)
 async def get_all_hostel_certificates(
+    hostel_id: int | None = Query(None),
     status: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
@@ -159,15 +164,18 @@ async def get_all_hostel_certificates(
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
     
-    certificates, total = await service.get_hostel_certificates(
-        current_user.id, cert_status, page, page_size
-    )
-    return {
-        "certificates": certificates,
-        "total": total,
-        "page": page,
-        "page_size": page_size
-    }
+    try:
+        certificates, total = await service.get_hostel_certificates(
+            current_user.id, hostel_id, cert_status, page, page_size
+        )
+        return {
+            "certificates": certificates,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 @router.post("/warden/{certificate_id}/approve", response_model=CertificateOut)
@@ -266,4 +274,3 @@ async def admin_reject_certificate(
         return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-

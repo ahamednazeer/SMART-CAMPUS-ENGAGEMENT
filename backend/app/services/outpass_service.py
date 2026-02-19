@@ -104,19 +104,39 @@ class OutpassService:
     async def get_pending_for_warden(
         self,
         warden_id: int,
+        hostel_id: int | None = None,
         page: int = 1,
         page_size: int = 20
     ) -> tuple[list[OutpassWithStudentDetails], int]:
-        """Get pending outpass requests for warden's hostel."""
-        # Get warden's hostel
-        hostel = await self.hostel_repo.get_warden_hostel(warden_id)
-        if not hostel:
+        """Get pending outpass requests for all hostels managed by warden."""
+        hostel_ids = await self._get_warden_hostel_ids(warden_id, hostel_id)
+        if not hostel_ids:
             raise ValueError("You are not assigned as warden to any hostel")
-        
+
+        student_ids = await self._get_student_ids_for_hostels(hostel_ids)
+        if not student_ids:
+            return [], 0
+
+        from sqlalchemy import select, func
         skip = (page - 1) * page_size
-        outpasses, total = await self.repo.get_pending_for_hostel(
-            hostel.id, skip, page_size
+        query = select(OutpassRequest).where(
+            OutpassRequest.student_id.in_(student_ids),
+            OutpassRequest.status == OutpassStatus.SUBMITTED,
         )
+        count_query = select(func.count(OutpassRequest.id)).where(
+            OutpassRequest.student_id.in_(student_ids),
+            OutpassRequest.status == OutpassStatus.SUBMITTED,
+        )
+
+        total_result = await self.db.execute(count_query)
+        total = total_result.scalar() or 0
+
+        result = await self.db.execute(
+            query.order_by(OutpassRequest.start_datetime.asc())
+            .offset(skip)
+            .limit(page_size)
+        )
+        outpasses = result.scalars().all()
         
         # Enrich with student details
         result = []
@@ -129,30 +149,23 @@ class OutpassService:
     async def get_all_hostel_outpasses(
         self,
         warden_id: int,
+        hostel_id: int | None = None,
         status: OutpassStatus | None = None,
         page: int = 1,
         page_size: int = 20
     ) -> tuple[list[OutpassWithStudentDetails], int]:
-        """Get all outpass requests for warden's hostel."""
-        hostel = await self.hostel_repo.get_warden_hostel(warden_id)
-        if not hostel:
+        """Get all outpass requests for all hostels managed by warden."""
+        hostel_ids = await self._get_warden_hostel_ids(warden_id, hostel_id)
+        if not hostel_ids:
             raise ValueError("You are not assigned as warden to any hostel")
-        
-        # Get student IDs from hostel
-        from sqlalchemy import select
-        from app.models.hostel import HostelAssignment
-        
-        assignment_result = await self.db.execute(
-            select(HostelAssignment.student_id)
-            .where(HostelAssignment.hostel_id == hostel.id, HostelAssignment.is_active == True)
-        )
-        student_ids = [row[0] for row in assignment_result.fetchall()]
+
+        student_ids = await self._get_student_ids_for_hostels(hostel_ids)
         
         if not student_ids:
             return [], 0
         
         # Query outpasses
-        from sqlalchemy import func
+        from sqlalchemy import select, func
         
         query = select(OutpassRequest).where(OutpassRequest.student_id.in_(student_ids))
         count_query = select(func.count(OutpassRequest.id)).where(
@@ -296,16 +309,44 @@ class OutpassService:
 
     async def _verify_warden_authority(self, warden_id: int, student_id: int) -> None:
         """Verify warden has authority over the student's hostel."""
-        warden_hostel = await self.hostel_repo.get_warden_hostel(warden_id)
-        if not warden_hostel:
+        warden_hostel_ids = set(await self._get_warden_hostel_ids(warden_id))
+        if not warden_hostel_ids:
             raise PermissionError("You are not assigned as warden to any hostel")
         
         student_assignment = await self.hostel_repo.get_student_assignment(student_id)
         if not student_assignment:
             raise ValueError("Student is not assigned to any hostel")
         
-        if student_assignment.hostel_id != warden_hostel.id:
+        if student_assignment.hostel_id not in warden_hostel_ids:
             raise PermissionError("You can only manage students in your hostel")
+
+    async def _get_warden_hostel_ids(
+        self, warden_id: int, hostel_id: int | None = None
+    ) -> list[int]:
+        """Get all active hostel IDs managed by a warden."""
+        hostels = await self.hostel_repo.get_warden_hostels(warden_id)
+        hostel_ids = [hostel.id for hostel in hostels]
+        if hostel_id is None:
+            return hostel_ids
+        if hostel_id not in hostel_ids:
+            raise PermissionError("You can only access your assigned hostels")
+        return [hostel_id]
+
+    async def _get_student_ids_for_hostels(self, hostel_ids: list[int]) -> list[int]:
+        """Get active student assignment IDs for a list of hostels."""
+        if not hostel_ids:
+            return []
+        from sqlalchemy import select
+        from app.models.hostel import HostelAssignment
+
+        assignment_result = await self.db.execute(
+            select(HostelAssignment.student_id)
+            .where(
+                HostelAssignment.hostel_id.in_(hostel_ids),
+                HostelAssignment.is_active == True,
+            )
+        )
+        return [row[0] for row in assignment_result.fetchall()]
 
     async def _enrich_outpass_with_student(
         self, outpass: OutpassRequest

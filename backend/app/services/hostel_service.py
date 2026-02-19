@@ -83,22 +83,34 @@ class HostelService:
         hostel = await self.repo.get_hostel(hostel_id)
         if not hostel:
             raise ValueError("Hostel not found")
+
+        update_data = data.model_dump(exclude_unset=True)
         
         # Check name uniqueness if changing
         if data.name and data.name != hostel.name:
             existing = await self.repo.get_hostel_by_name(data.name)
             if existing:
                 raise ValueError(f"Hostel with name '{data.name}' already exists")
+
+        if "warden_id" in update_data and update_data["warden_id"] is not None:
+            await self._validate_warden(update_data["warden_id"])
         
         updated = await self.repo.update_hostel(
             hostel_id,
-            **data.model_dump(exclude_unset=True)
+            **update_data
         )
         return updated
 
     async def assign_warden(self, hostel_id: int, warden_id: int) -> Hostel:
         """Assign warden to hostel."""
-        # Verify warden exists and has correct role
+        await self._validate_warden(warden_id)
+        hostel = await self.repo.assign_warden(hostel_id, warden_id)
+        if not hostel:
+            raise ValueError("Hostel not found")
+        return hostel
+
+    async def _validate_warden(self, warden_id: int) -> None:
+        """Ensure the requested warden exists and has a valid role."""
         from sqlalchemy import select
         result = await self.db.execute(select(User).where(User.id == warden_id))
         warden = result.scalar_one_or_none()
@@ -108,12 +120,13 @@ class HostelService:
         
         if warden.role not in [UserRole.WARDEN, UserRole.ADMIN]:
             raise ValueError("User must have WARDEN or ADMIN role")
-        
-        return await self.repo.assign_warden(hostel_id, warden_id)
 
     async def remove_warden(self, hostel_id: int) -> Hostel:
         """Remove warden from hostel."""
-        return await self.repo.assign_warden(hostel_id, None)
+        hostel = await self.repo.assign_warden(hostel_id, None)
+        if not hostel:
+            raise ValueError("Hostel not found")
+        return hostel
 
     # ==================== ROOM OPERATIONS ====================
 
@@ -166,6 +179,34 @@ class HostelService:
 
     # ==================== ASSIGNMENT OPERATIONS ====================
 
+    @staticmethod
+    def _to_assignment_details(
+        assignment: HostelAssignment,
+        student: User,
+        hostel: Hostel,
+        room: HostelRoom,
+    ) -> HostelAssignmentWithDetails:
+        """Map assignment + joined entities into response schema."""
+        return HostelAssignmentWithDetails(
+            id=assignment.id,
+            student_id=assignment.student_id,
+            hostel_id=assignment.hostel_id,
+            room_id=assignment.room_id,
+            assigned_at=assignment.assigned_at,
+            is_active=assignment.is_active,
+            student_name=f"{student.first_name} {student.last_name}",
+            student_register_number=student.register_number,
+            student_email=student.email,
+            student_department=student.department,
+            student_batch=student.batch,
+            student_degree=student.degree,
+            student_study_year=student.study_year,
+            student_gender=student.gender,
+            hostel_name=hostel.name,
+            room_number=room.room_number,
+            room_floor=room.floor,
+        )
+
     async def assign_student(self, data: HostelAssignmentCreate) -> HostelAssignment:
         """Assign student to a room."""
         # Verify student
@@ -194,9 +235,25 @@ class HostelService:
             raise ValueError("Room not found")
         if not room.is_active:
             raise ValueError("Room is inactive")
-        
+
         if room.hostel_id != data.hostel_id:
             raise ValueError("Room does not belong to specified hostel")
+
+        # Enforce explicit remove-first flow (no implicit transfer between hostels/rooms).
+        existing_assignment = await self.repo.get_student_assignment(data.student_id)
+        if existing_assignment:
+            existing_hostel = await self.repo.get_hostel(existing_assignment.hostel_id)
+            existing_room = await self.repo.get_room(existing_assignment.room_id)
+            existing_hostel_name = (
+                existing_hostel.name if existing_hostel else f"hostel {existing_assignment.hostel_id}"
+            )
+            existing_room_label = (
+                existing_room.room_number if existing_room else str(existing_assignment.room_id)
+            )
+            raise ValueError(
+                f"Student is already assigned to {existing_hostel_name} (Room {existing_room_label}). "
+                "Remove the current assignment before assigning a new hostel/room."
+            )
 
         # Hostel type vs gender matching
         hostel_type = hostel.hostel_type or HostelType.CO_ED
@@ -225,43 +282,19 @@ class HostelService:
 
     async def get_hostel_students(self, hostel_id: int) -> list[HostelAssignmentWithDetails]:
         """Get all students in a hostel with details."""
-        assignments = await self.repo.get_hostel_assignments(hostel_id)
-        result = []
-        
-        from sqlalchemy import select
-        for assignment in assignments:
-            # Get student details
-            student_result = await self.db.execute(
-                select(User).where(User.id == assignment.student_id)
-            )
-            student = student_result.scalar_one_or_none()
-            
-            # Get hostel and room
-            hostel = await self.repo.get_hostel(assignment.hostel_id)
-            room = await self.repo.get_room(assignment.room_id)
-            
-            if student and hostel and room:
-                result.append(HostelAssignmentWithDetails(
-                    id=assignment.id,
-                    student_id=assignment.student_id,
-                    hostel_id=assignment.hostel_id,
-                    room_id=assignment.room_id,
-                    assigned_at=assignment.assigned_at,
-                    is_active=assignment.is_active,
-                    student_name=f"{student.first_name} {student.last_name}",
-                    student_register_number=student.register_number,
-                    student_email=student.email,
-                    student_department=student.department,
-                    student_batch=student.batch,
-                    student_degree=student.degree,
-                    student_study_year=student.study_year,
-                    student_gender=student.gender,
-                    hostel_name=hostel.name,
-                    room_number=room.room_number,
-                    room_floor=room.floor
-                ))
-        
-        return result
+        rows = await self.repo.get_hostel_assignments_with_details(hostel_id)
+        return [
+            self._to_assignment_details(assignment, student, hostel, room)
+            for assignment, student, hostel, room in rows
+        ]
+
+    async def get_all_active_assignments(self) -> list[HostelAssignmentWithDetails]:
+        """Get all active student-hostel assignments with full details."""
+        rows = await self.repo.get_all_active_assignments_with_details()
+        return [
+            self._to_assignment_details(assignment, student, hostel, room)
+            for assignment, student, hostel, room in rows
+        ]
 
     async def get_unassigned_hostellers_for_hostel(
         self,
@@ -274,7 +307,7 @@ class HostelService:
 
         hostel_type = hostel.hostel_type or HostelType.CO_ED
         required_gender = self._required_gender(hostel_type)
-        candidates = await self.repo.get_unassigned_hosteller_students()
+        candidates = await self.repo.get_unassigned_hosteller_students(hostel_id=hostel_id)
 
         profiles: list[HostelStudentProfile] = []
         for student in candidates:
@@ -347,7 +380,7 @@ class HostelService:
 
         hostel_type = hostel.hostel_type or HostelType.CO_ED
         required_gender = self._required_gender(hostel_type)
-        candidates = await self.repo.get_unassigned_hosteller_students()
+        candidates = await self.repo.get_unassigned_hosteller_students(hostel_id=hostel_id)
         if department:
             candidates = [c for c in candidates if c.department == department]
         if study_year:
@@ -585,6 +618,10 @@ class HostelService:
         )
 
     # ==================== WARDEN HELPERS ====================
+
+    async def get_warden_hostels(self, warden_id: int) -> list[Hostel]:
+        """Get all active hostels managed by warden."""
+        return await self.repo.get_warden_hostels(warden_id)
 
     async def get_warden_hostel(self, warden_id: int) -> Hostel | None:
         """Get hostel managed by warden."""

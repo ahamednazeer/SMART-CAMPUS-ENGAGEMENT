@@ -89,7 +89,7 @@ class HostelAssignment(Base):
     
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     
-    # Student (unique - one student can only have one active assignment)
+    # Student (globally unique row; assignment is reactivated/updated on re-assign)
     student_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), unique=True, index=True
     )

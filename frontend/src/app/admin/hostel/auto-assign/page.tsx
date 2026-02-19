@@ -79,7 +79,9 @@ interface UnassignedHosteller {
 
 export default function HostelAutoAssignPage() {
     const router = useRouter();
+    const [hostels, setHostels] = useState<HostelDetails[]>([]);
     const [hostel, setHostel] = useState<HostelDetails | null>(null);
+    const [selectedHostelId, setSelectedHostelId] = useState<number | null>(null);
     const [unassigned, setUnassigned] = useState<UnassignedHosteller[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingUnassigned, setLoadingUnassigned] = useState(false);
@@ -101,27 +103,50 @@ export default function HostelAutoAssignPage() {
     });
 
     useEffect(() => {
-        fetchHostel();
-        fetchUnassigned();
-        fetchLatestResult();
+        initializePage();
     }, []);
 
-    async function fetchHostel() {
+    async function initializePage() {
         setLoading(true);
         try {
-            const data = await api.getWardenHostel();
-            setHostel(data);
+            const assignedHostels = await api.getWardenHostels();
+            const hostelList: HostelDetails[] = assignedHostels || [];
+            setHostels(hostelList);
+            if (hostelList.length === 0) {
+                setHostel(null);
+                return;
+            }
+
+            const defaultHostelId = hostelList[0].id;
+            setSelectedHostelId(defaultHostelId);
+            await loadHostelScopedData(defaultHostelId);
         } catch (err) {
-            console.error('Failed to load hostel info', err);
+            console.error('Failed to initialize auto-assign page', err);
         } finally {
             setLoading(false);
         }
     }
 
-    async function fetchUnassigned() {
+    async function loadHostelScopedData(hostelId: number) {
+        if (!hostelId) return;
+        const [hostelData, unassignedData, latest] = await Promise.all([
+            api.getWardenHostel(hostelId),
+            api.getWardenUnassignedHostellers(hostelId),
+            api.getLatestAutoAssignResult(hostelId).catch(() => null),
+        ]);
+        setHostel(hostelData);
+        setUnassigned(unassignedData || []);
+        setLastResult(latest || null);
+    }
+
+    async function fetchUnassigned(hostelId: number) {
+        if (!hostelId) {
+            setUnassigned([]);
+            return;
+        }
         setLoadingUnassigned(true);
         try {
-            const data = await api.getWardenUnassignedHostellers();
+            const data = await api.getWardenUnassignedHostellers(hostelId);
             setUnassigned(data || []);
         } catch (err) {
             console.error('Failed to load unassigned hostellers', err);
@@ -130,12 +155,16 @@ export default function HostelAutoAssignPage() {
         }
     }
 
-    async function fetchLatestResult() {
+    async function handleHostelChange(hostelId: number) {
+        if (!hostelId || hostelId === selectedHostelId) return;
+        setSelectedHostelId(hostelId);
+        setPreview(null);
+        setSelected(new Set());
+        setLoading(true);
         try {
-            const data = await api.getLatestAutoAssignResult();
-            setLastResult(data || null);
-        } catch (err) {
-            console.error('Failed to load latest auto-assign result', err);
+            await loadHostelScopedData(hostelId);
+        } finally {
+            setLoading(false);
         }
     }
 
@@ -167,6 +196,7 @@ export default function HostelAutoAssignPage() {
     }, [unassigned, filters]);
 
     async function generateRecommendations() {
+        if (!selectedHostelId) return;
         setGenerating(true);
         try {
             const params: any = {
@@ -179,7 +209,7 @@ export default function HostelAutoAssignPage() {
             if (filters.gender) params.gender = filters.gender;
             if (filters.limit) params.limit = parseInt(filters.limit, 10);
 
-            const result: AutoAssignPreview = await api.previewAutoAssignHostelRooms(params);
+            const result: AutoAssignPreview = await api.previewAutoAssignHostelRooms(params, selectedHostelId);
             setPreview(result);
             setSelected(new Set(result.recommendations.map(r => r.student_id)));
         } catch (err: any) {
@@ -190,7 +220,7 @@ export default function HostelAutoAssignPage() {
     }
 
     async function confirmAssignments() {
-        if (!preview) return;
+        if (!preview || !selectedHostelId) return;
         const assignments = preview.recommendations
             .filter(rec => selected.has(rec.student_id))
             .map(rec => ({ student_id: rec.student_id, room_id: rec.room_id }));
@@ -202,11 +232,11 @@ export default function HostelAutoAssignPage() {
 
         setConfirming(true);
         try {
-            const result: AutoAssignResult = await api.confirmAutoAssignHostelRooms(assignments);
+            const result: AutoAssignResult = await api.confirmAutoAssignHostelRooms(assignments, selectedHostelId);
             setLastResult(result);
             setPreview(null);
             setSelected(new Set());
-            await fetchUnassigned();
+            await fetchUnassigned(selectedHostelId);
         } catch (err: any) {
             alert(err.message || 'Failed to confirm assignments');
         } finally {
@@ -215,6 +245,7 @@ export default function HostelAutoAssignPage() {
     }
 
     async function handleExport(format: 'excel' | 'pdf') {
+        if (!selectedHostelId) return;
         setExporting(format);
         try {
             const params: any = {};
@@ -224,12 +255,13 @@ export default function HostelAutoAssignPage() {
             if (filters.batch) params.batch = filters.batch;
             if (filters.gender) params.gender = filters.gender;
 
-            const blob = await api.downloadHostelAssignments(format, params);
+            const blob = await api.downloadHostelAssignments(format, params, selectedHostelId);
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             const date = new Date().toISOString().slice(0, 10);
+            const hostelSlug = (hostel?.name || 'hostel').toLowerCase().replace(/\s+/g, '_');
             link.href = url;
-            link.download = `hostel_assignments_${date}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
+            link.download = `${hostelSlug}_assignments_${date}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -259,6 +291,32 @@ export default function HostelAutoAssignPage() {
         });
     }
 
+    if (loading) {
+        return (
+            <div className="bg-slate-800/40 border border-slate-700/60 rounded-lg p-8 text-center">
+                <Pulse size={32} className="text-slate-500 mx-auto mb-2 animate-pulse" />
+                <p className="text-slate-500">Loading hostel...</p>
+            </div>
+        );
+    }
+
+    if (!hostel) {
+        return (
+            <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-10 text-center">
+                <Sparkle size={48} className="text-slate-600 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-slate-300 mb-2">No Hostel Assignment</h3>
+                <p className="text-slate-500 mb-4">You are not assigned to any active hostel.</p>
+                <button
+                    onClick={() => router.push('/admin/hostel')}
+                    className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg inline-flex items-center gap-2"
+                >
+                    <ArrowLeft size={16} />
+                    Back to Dashboard
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-8">
             <div className="flex items-center justify-between">
@@ -267,24 +325,38 @@ export default function HostelAutoAssignPage() {
                         <Sparkle size={28} weight="duotone" className="text-indigo-400" />
                         Hostel Auto Assign
                     </h1>
-                    <p className="text-slate-500 mt-1">Generate recommendations, review, then confirm.</p>
+                    <p className="text-slate-500 mt-1">
+                        Generate recommendations, review, and confirm for the selected hostel.
+                    </p>
                 </div>
-                <button
-                    onClick={() => router.push('/admin/hostel')}
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg flex items-center gap-2"
-                >
-                    <ArrowLeft size={16} />
-                    Back to Dashboard
-                </button>
+                <div className="flex items-end gap-3">
+                    <div className="min-w-[260px]">
+                        <label className="block text-[10px] font-mono uppercase tracking-widest text-slate-500 mb-2">
+                            Active Hostel ({hostels.length})
+                        </label>
+                        <select
+                            value={selectedHostelId ?? ''}
+                            onChange={(e) => void handleHostelChange(Number(e.target.value))}
+                            className="w-full bg-slate-900/70 border border-slate-700/60 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                        >
+                            {hostels.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                    {item.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <button
+                        onClick={() => router.push('/admin/hostel')}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg flex items-center gap-2"
+                    >
+                        <ArrowLeft size={16} />
+                        Back to Dashboard
+                    </button>
+                </div>
             </div>
 
-            {loading ? (
-                <div className="bg-slate-800/40 border border-slate-700/60 rounded-lg p-8 text-center">
-                    <Pulse size={32} className="text-slate-500 mx-auto mb-2 animate-pulse" />
-                    <p className="text-slate-500">Loading hostel...</p>
-                </div>
-            ) : hostel ? (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="bg-slate-900/60 border border-slate-700/60 rounded-xl p-5">
                         <h2 className="text-sm font-mono text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                             <Users size={16} />
@@ -453,7 +525,6 @@ export default function HostelAutoAssignPage() {
                         </div>
                     </div>
                 </div>
-            ) : null}
 
             <div className="bg-slate-900/60 border border-slate-700/60 rounded-xl p-5">
                 <div className="flex items-center justify-between mb-4">
@@ -596,12 +667,15 @@ export default function HostelAutoAssignPage() {
                         Unassigned Hostellers
                     </h2>
                     <button
-                        onClick={fetchUnassigned}
+                        onClick={() => selectedHostelId && fetchUnassigned(selectedHostelId)}
                         className="text-xs text-slate-400 hover:text-slate-200"
                     >
                         Refresh
                     </button>
                 </div>
+                <p className="text-xs text-slate-500 mb-4">
+                    Includes only hosteller students who were never assigned to any hostel room.
+                </p>
 
                 {loadingUnassigned ? (
                     <div className="text-slate-500 text-sm">Loading unassigned hostellers...</div>

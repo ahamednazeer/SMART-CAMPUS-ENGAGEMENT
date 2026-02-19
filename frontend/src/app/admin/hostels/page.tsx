@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import {
     Buildings,
@@ -50,6 +50,7 @@ interface Room {
 interface User {
     id: number;
     username: string;
+    email?: string | null;
     first_name: string;
     last_name: string;
     role: string;
@@ -57,9 +58,31 @@ interface User {
     register_number: string | null;
 }
 
+interface HostelAssignmentDetail {
+    id: number;
+    student_id: number;
+    hostel_id: number;
+    room_id: number;
+    assigned_at: string;
+    is_active: boolean;
+    student_name: string;
+    student_register_number: string | null;
+    student_email: string | null;
+    student_department: string | null;
+    student_batch: string | null;
+    student_degree: string | null;
+    student_study_year: number | null;
+    student_gender: string | null;
+    hostel_name: string;
+    room_number: string;
+    room_floor: number | null;
+}
+
 export default function AdminHostelsPage() {
     const [hostels, setHostels] = useState<Hostel[]>([]);
+    const [assignments, setAssignments] = useState<HostelAssignmentDetail[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingAssignments, setLoadingAssignments] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     // Modal states
@@ -79,7 +102,10 @@ export default function AdminHostelsPage() {
     const [assignForm, setAssignForm] = useState({ student_id: '', room_id: '' });
     const [wardenForm, setWardenForm] = useState({ warden_id: '' });
     const [submitting, setSubmitting] = useState(false);
+    const [removingStudentId, setRemovingStudentId] = useState<number | null>(null);
     const [formError, setFormError] = useState<string | null>(null);
+    const [assignmentSearch, setAssignmentSearch] = useState('');
+    const [assignmentHostelFilter, setAssignmentHostelFilter] = useState<string>('all');
 
     // Users for assignment
     const [users, setUsers] = useState<User[]>([]);
@@ -89,7 +115,45 @@ export default function AdminHostelsPage() {
 
     useEffect(() => {
         fetchHostels();
+        fetchAssignments();
     }, []);
+
+    const assignedStudentIds = useMemo(
+        () => new Set(assignments.map((row) => row.student_id)),
+        [assignments]
+    );
+
+    const assignableUsers = useMemo(
+        () => users.filter((user) => !assignedStudentIds.has(user.id)),
+        [users, assignedStudentIds]
+    );
+
+    const filteredAssignments = useMemo(() => {
+        const query = assignmentSearch.trim().toLowerCase();
+        return assignments.filter((row) => {
+            if (assignmentHostelFilter !== 'all' && String(row.hostel_id) !== assignmentHostelFilter) {
+                return false;
+            }
+            if (!query) {
+                return true;
+            }
+            const searchable = [
+                row.student_name,
+                row.student_register_number,
+                row.student_email,
+                row.hostel_name,
+                row.room_number,
+                row.student_department,
+                row.student_degree,
+                row.student_batch,
+                row.student_gender,
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+            return searchable.includes(query);
+        });
+    }, [assignments, assignmentHostelFilter, assignmentSearch]);
 
     async function fetchHostels() {
         setLoading(true);
@@ -101,6 +165,18 @@ export default function AdminHostelsPage() {
             setError(err.message || 'Failed to load hostels');
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function fetchAssignments() {
+        setLoadingAssignments(true);
+        try {
+            const data = await api.getAllHostelAssignments();
+            setAssignments(data || []);
+        } catch (err: any) {
+            console.error('Failed to load assignment directory:', err);
+        } finally {
+            setLoadingAssignments(false);
         }
     }
 
@@ -191,8 +267,11 @@ export default function AdminHostelsPage() {
             });
             setShowAssignModal(false);
             setAssignForm({ student_id: '', room_id: '' });
-            await fetchRooms(selectedHostelId);
-            await fetchHostels();
+            await Promise.all([
+                fetchRooms(selectedHostelId),
+                fetchHostels(),
+                fetchAssignments()
+            ]);
         } catch (err: any) {
             setFormError(err.message || 'Failed to assign student');
         } finally {
@@ -213,6 +292,7 @@ export default function AdminHostelsPage() {
     function openAssignModal(hostelId: number) {
         setSelectedHostelId(hostelId);
         fetchRooms(hostelId);
+        fetchAssignments();
         fetchUsers();
         setShowAssignModal(true);
     }
@@ -238,6 +318,27 @@ export default function AdminHostelsPage() {
             setFormError(err.message || 'Failed to assign warden');
         } finally {
             setSubmitting(false);
+        }
+    }
+
+    async function handleRemoveAssignment(studentId: number, studentName: string) {
+        const confirmed = window.confirm(
+            `Remove hostel assignment for ${studentName}? You can assign again after removal.`
+        );
+        if (!confirmed) return;
+
+        setRemovingStudentId(studentId);
+        try {
+            await api.removeStudentAssignment(studentId);
+            await Promise.all([
+                fetchAssignments(),
+                fetchHostels(),
+                selectedHostelId ? fetchRooms(selectedHostelId) : Promise.resolve(),
+            ]);
+        } catch (err: any) {
+            alert(err.message || 'Failed to remove assignment');
+        } finally {
+            setRemovingStudentId(null);
         }
     }
 
@@ -283,6 +384,113 @@ export default function AdminHostelsPage() {
                     {error}
                 </div>
             )}
+
+            <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <h2 className="text-sm font-mono text-slate-400 uppercase tracking-widest">
+                        Assignment Directory (All Hostels)
+                    </h2>
+                    <div className="text-xs text-slate-500">
+                        Active Assignments: <span className="text-slate-300 font-mono">{assignments.length}</span>
+                        {' • '}
+                        Hostels Covered: <span className="text-slate-300 font-mono">{new Set(assignments.map((row) => row.hostel_id)).size}</span>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                    <div className="relative md:col-span-2">
+                        <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <input
+                            type="text"
+                            value={assignmentSearch}
+                            onChange={(e) => setAssignmentSearch(e.target.value)}
+                            placeholder="Search by student, register no, hostel, room, dept..."
+                            className="w-full bg-slate-900/60 border border-slate-700/60 rounded-lg pl-9 pr-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-indigo-500"
+                        />
+                    </div>
+                    <select
+                        value={assignmentHostelFilter}
+                        onChange={(e) => setAssignmentHostelFilter(e.target.value)}
+                        className="bg-slate-900/60 border border-slate-700/60 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-indigo-500"
+                    >
+                        <option value="all">All Hostels</option>
+                        {hostels.map((hostel) => (
+                            <option key={hostel.id} value={String(hostel.id)}>
+                                {hostel.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {loadingAssignments ? (
+                    <div className="flex items-center gap-2 text-slate-500 text-sm">
+                        <div className="w-4 h-4 rounded-full border-2 border-slate-700 border-t-indigo-400 animate-spin" />
+                        Loading assignments...
+                    </div>
+                ) : filteredAssignments.length === 0 ? (
+                    <div className="bg-slate-900/50 border border-slate-700/50 rounded-lg p-6 text-center">
+                        <p className="text-slate-400 text-sm">No assignments match this filter.</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto border border-slate-700/50 rounded-lg">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-900/60 text-slate-400 uppercase text-xs">
+                                <tr>
+                                    <th className="p-3">Student</th>
+                                    <th className="p-3">Reg No</th>
+                                    <th className="p-3">Email</th>
+                                    <th className="p-3">Hostel</th>
+                                    <th className="p-3">Room</th>
+                                    <th className="p-3">Dept/Year</th>
+                                    <th className="p-3">Degree/Batch</th>
+                                    <th className="p-3">Gender</th>
+                                    <th className="p-3">Assigned At</th>
+                                    <th className="p-3">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-700/60">
+                                {filteredAssignments.map((row) => (
+                                    <tr key={row.id} className="hover:bg-slate-900/30">
+                                        <td className="p-3 text-slate-200">{row.student_name}</td>
+                                        <td className="p-3 text-slate-400">{row.student_register_number || '-'}</td>
+                                        <td className="p-3 text-slate-400">{row.student_email || '-'}</td>
+                                        <td className="p-3 text-indigo-300">{row.hostel_name}</td>
+                                        <td className="p-3 text-slate-200 font-mono">
+                                            {row.room_number}
+                                            {row.room_floor !== null && row.room_floor !== undefined ? ` (F${row.room_floor})` : ''}
+                                        </td>
+                                        <td className="p-3 text-slate-400">
+                                            {(row.student_department || '-')}{' / '}{(row.student_study_year ?? '-')}
+                                        </td>
+                                        <td className="p-3 text-slate-400">
+                                            {(row.student_degree || '-')}{' / '}{(row.student_batch || '-')}
+                                        </td>
+                                        <td className="p-3 text-slate-400">{row.student_gender || '-'}</td>
+                                        <td className="p-3 text-slate-500">
+                                            {new Date(row.assigned_at).toLocaleString()}
+                                        </td>
+                                        <td className="p-3">
+                                            <button
+                                                onClick={() => void handleRemoveAssignment(row.student_id, row.student_name)}
+                                                disabled={removingStudentId === row.student_id}
+                                                className="bg-red-900/30 border border-red-700/40 hover:bg-red-800/40 disabled:opacity-50 text-red-300 px-2 py-1 rounded text-xs inline-flex items-center gap-1"
+                                                title="Remove assignment"
+                                            >
+                                                {removingStudentId === row.student_id ? (
+                                                    <div className="w-3 h-3 rounded-full border border-red-300/40 border-t-red-200 animate-spin" />
+                                                ) : (
+                                                    <Trash size={12} />
+                                                )}
+                                                Remove
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
 
             {/* Hostels List */}
             {hostels.length === 0 ? (
@@ -554,6 +762,16 @@ export default function AdminHostelsPage() {
                         <form onSubmit={handleAssignStudent} className="space-y-4">
                             <div>
                                 <label className="block text-sm text-slate-400 mb-1">Select Student *</label>
+                                {loadingUsers || loadingAssignments ? (
+                                    <div className="flex items-center gap-2 text-slate-500 py-2 text-sm">
+                                        <div className="w-4 h-4 rounded-full border-2 border-slate-700 border-t-green-400 animate-spin" />
+                                        Loading students...
+                                    </div>
+                                ) : assignableUsers.length === 0 ? (
+                                    <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-3 text-yellow-300 text-sm">
+                                        No unassigned hosteller students available. Remove an existing assignment first.
+                                    </div>
+                                ) : (
                                 <select
                                     value={assignForm.student_id}
                                     onChange={(e) => setAssignForm({ ...assignForm, student_id: e.target.value })}
@@ -561,12 +779,13 @@ export default function AdminHostelsPage() {
                                     required
                                 >
                                     <option value="">Select a student...</option>
-                                    {users.map((user) => (
+                                    {assignableUsers.map((user) => (
                                         <option key={user.id} value={user.id}>
                                             {user.first_name} {user.last_name} ({user.register_number || user.username})
                                         </option>
                                     ))}
                                 </select>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm text-slate-400 mb-1">Select Room *</label>
@@ -594,7 +813,13 @@ export default function AdminHostelsPage() {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={submitting || loadingUsers || loadingRooms}
+                                    disabled={
+                                        submitting ||
+                                        loadingUsers ||
+                                        loadingRooms ||
+                                        loadingAssignments ||
+                                        assignableUsers.length === 0
+                                    }
                                     className="flex-1 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white py-2 px-4 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
                                 >
                                     {submitting ? <div className="w-4 h-4 rounded-full border-2 border-green-300/40 border-t-white animate-spin" /> : <UserPlus size={18} weight="duotone" />}

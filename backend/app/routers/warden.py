@@ -126,16 +126,32 @@ def _generate_pdf(rows: list[dict[str, str]]) -> bytes:
     return doc.tobytes()
 
 
+async def _resolve_warden_hostel(
+    hostel_service: HostelService,
+    warden_id: int,
+    hostel_id: int | None = None,
+):
+    """Resolve selected hostel for a warden, defaulting to latest assigned."""
+    if hostel_id is None:
+        return await hostel_service.get_warden_hostel(warden_id)
+    hostels = await hostel_service.get_warden_hostels(warden_id)
+    for hostel in hostels:
+        if hostel.id == hostel_id:
+            return hostel
+    return None
+
+
 # ==================== HOSTEL INFO ====================
 
 @router.get("/hostel", response_model=HostelWithDetails | None)
 async def get_my_hostel(
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_warden)]
+    current_user: Annotated[User, Depends(require_warden)],
+    hostel_id: int | None = Query(None)
 ):
     """Get the hostel managed by the current warden."""
     service = HostelService(db)
-    hostel = await service.get_warden_hostel(current_user.id)
+    hostel = await _resolve_warden_hostel(service, current_user.id, hostel_id)
     
     if not hostel:
         return None
@@ -149,14 +165,31 @@ async def get_my_hostel(
     return None
 
 
-@router.get("/students", response_model=list[HostelAssignmentWithDetails])
-async def get_hostel_students(
+@router.get("/hostels", response_model=list[HostelWithDetails])
+async def get_my_hostels(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_warden)]
 ):
+    """Get all hostels managed by the current warden."""
+    service = HostelService(db)
+    assigned = await service.get_warden_hostels(current_user.id)
+    if not assigned:
+        return []
+
+    assigned_ids = {hostel.id for hostel in assigned}
+    all_hostels = await service.list_hostels()
+    return [hostel for hostel in all_hostels if hostel.id in assigned_ids]
+
+
+@router.get("/students", response_model=list[HostelAssignmentWithDetails])
+async def get_hostel_students(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_warden)],
+    hostel_id: int | None = Query(None)
+):
     """Get all students in the warden's hostel."""
     hostel_service = HostelService(db)
-    hostel = await hostel_service.get_warden_hostel(current_user.id)
+    hostel = await _resolve_warden_hostel(hostel_service, current_user.id, hostel_id)
     
     if not hostel:
         raise HTTPException(
@@ -170,11 +203,12 @@ async def get_hostel_students(
 @router.get("/hostel/unassigned-students", response_model=list[HostelStudentProfile])
 async def get_unassigned_hostel_students(
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_warden)]
+    current_user: Annotated[User, Depends(require_warden)],
+    hostel_id: int | None = Query(None)
 ):
     """Get unassigned hosteller students eligible for the warden's hostel."""
     hostel_service = HostelService(db)
-    hostel = await hostel_service.get_warden_hostel(current_user.id)
+    hostel = await _resolve_warden_hostel(hostel_service, current_user.id, hostel_id)
 
     if not hostel:
         raise HTTPException(
@@ -192,6 +226,7 @@ async def get_unassigned_hostel_students(
 async def preview_auto_assign_hostel_students(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_warden)],
+    hostel_id: int | None = Query(None),
     department: str | None = Query(None),
     study_year: int | None = Query(None, ge=1, le=8),
     degree: str | None = Query(None),
@@ -202,7 +237,7 @@ async def preview_auto_assign_hostel_students(
 ):
     """Preview auto-assign recommendations for warden's hostel."""
     hostel_service = HostelService(db)
-    hostel = await hostel_service.get_warden_hostel(current_user.id)
+    hostel = await _resolve_warden_hostel(hostel_service, current_user.id, hostel_id)
 
     if not hostel:
         raise HTTPException(
@@ -232,11 +267,12 @@ async def preview_auto_assign_hostel_students(
 async def confirm_auto_assign_hostel_students(
     payload: HostelAutoAssignConfirmRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_warden)]
+    current_user: Annotated[User, Depends(require_warden)],
+    hostel_id: int | None = Query(None)
 ):
     """Confirm and apply auto-assign recommendations."""
     hostel_service = HostelService(db)
-    hostel = await hostel_service.get_warden_hostel(current_user.id)
+    hostel = await _resolve_warden_hostel(hostel_service, current_user.id, hostel_id)
 
     if not hostel:
         raise HTTPException(
@@ -257,11 +293,12 @@ async def confirm_auto_assign_hostel_students(
 @router.get("/hostel/auto-assign/latest", response_model=HostelAutoAssignResult | None)
 async def get_latest_auto_assign_result(
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_warden)]
+    current_user: Annotated[User, Depends(require_warden)],
+    hostel_id: int | None = Query(None)
 ):
     """Get latest auto-assign result for warden's hostel."""
     hostel_service = HostelService(db)
-    hostel = await hostel_service.get_warden_hostel(current_user.id)
+    hostel = await _resolve_warden_hostel(hostel_service, current_user.id, hostel_id)
 
     if not hostel:
         raise HTTPException(
@@ -276,6 +313,7 @@ async def get_latest_auto_assign_result(
 async def export_hostel_assignments(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_warden)],
+    hostel_id: int | None = Query(None),
     format: str = Query("excel"),
     department: str | None = Query(None),
     study_year: int | None = Query(None, ge=1, le=8),
@@ -285,7 +323,7 @@ async def export_hostel_assignments(
 ):
     """Export assigned hostel students (warden only)."""
     hostel_service = HostelService(db)
-    hostel = await hostel_service.get_warden_hostel(current_user.id)
+    hostel = await _resolve_warden_hostel(hostel_service, current_user.id, hostel_id)
 
     if not hostel:
         raise HTTPException(
@@ -323,6 +361,7 @@ async def export_hostel_assignments(
 async def get_pending_outpasses(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_warden)],
+    hostel_id: int | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100)
 ):
@@ -330,17 +369,20 @@ async def get_pending_outpasses(
     service = OutpassService(db)
     try:
         outpasses, total = await service.get_pending_for_warden(
-            current_user.id, page, page_size
+            current_user.id, hostel_id, page, page_size
         )
         return outpasses
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 @router.get("/outpass/all", response_model=list[OutpassWithStudentDetails])
 async def get_all_outpasses(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_warden)],
+    hostel_id: int | None = Query(None),
     status_filter: OutpassStatus | None = Query(None, alias="status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100)
@@ -349,11 +391,13 @@ async def get_all_outpasses(
     service = OutpassService(db)
     try:
         outpasses, total = await service.get_all_hostel_outpasses(
-            current_user.id, status_filter, page, page_size
+            current_user.id, hostel_id, status_filter, page, page_size
         )
         return outpasses
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 @router.get("/outpass/student/{student_id}", response_model=list[OutpassOut])

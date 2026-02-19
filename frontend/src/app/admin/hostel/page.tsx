@@ -183,7 +183,9 @@ const formatDateTime = (dateStr: string) => {
 };
 
 export default function WardenDashboardPage() {
+    const [hostels, setHostels] = useState<HostelDetails[]>([]);
     const [hostel, setHostel] = useState<HostelDetails | null>(null);
+    const [selectedHostelId, setSelectedHostelId] = useState<number | null>(null);
     const [pendingOutpasses, setPendingOutpasses] = useState<OutpassWithStudent[]>([]);
     const [activeOutpasses, setActiveOutpasses] = useState<OutpassWithStudent[]>([]);
     const [expiredOutpasses, setExpiredOutpasses] = useState<OutpassWithStudent[]>([]);
@@ -239,30 +241,57 @@ export default function WardenDashboardPage() {
     };
 
     useEffect(() => {
-        fetchData();
+        initializeDashboard();
     }, []);
 
     useEffect(() => {
+        if (selectedHostelId === null) return;
         if (activeTab === 'students') {
-            fetchHostelStudents();
+            fetchHostelStudents(selectedHostelId);
         }
         if (activeTab === 'unassigned') {
-            fetchUnassignedHostellers();
+            fetchUnassignedHostellers(selectedHostelId);
         }
-    }, [activeTab]);
+    }, [activeTab, selectedHostelId]);
 
-    async function fetchData() {
+    async function initializeDashboard() {
+        setLoading(true);
+        setError(null);
+        try {
+            const assignedHostels = await api.getWardenHostels();
+            const hostelList: HostelDetails[] = assignedHostels || [];
+            setHostels(hostelList);
+
+            if (hostelList.length === 0) {
+                setHostel(null);
+                setError('You are not assigned as warden to any hostel');
+                return;
+            }
+
+            const defaultHostelId = hostelList[0].id;
+            setSelectedHostelId(defaultHostelId);
+            await fetchData(defaultHostelId);
+        } catch (err: any) {
+            setError(err.message || 'Failed to load data');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function fetchData(hostelId: number) {
+        if (!hostelId) return;
         setLoading(true);
         setError(null);
         try {
             const [hostelData, pendingData, approvedData, certData, latestAutoAssign] = await Promise.all([
-                api.getWardenHostel(),
-                api.getPendingOutpasses(),
-                api.getApprovedOutpasses ? api.getApprovedOutpasses() : Promise.resolve([]),
-                api.getPendingCertificates().catch(() => []),
-                api.getLatestAutoAssignResult().catch(() => null)
+                api.getWardenHostel(hostelId),
+                api.getPendingOutpasses(1, 20, hostelId),
+                api.getApprovedOutpasses ? api.getApprovedOutpasses(1, 100, hostelId) : Promise.resolve([]),
+                api.getPendingCertificates(hostelId).catch(() => []),
+                api.getLatestAutoAssignResult(hostelId).catch(() => null)
             ]);
             setHostel(hostelData);
+            setHostels((prev) => prev.map((item) => (item.id === hostelData?.id ? hostelData : item)));
             setPendingOutpasses(pendingData || []);
             setPendingCertificates(certData || []);
             setLastAutoAssignResult(latestAutoAssign || null);
@@ -289,6 +318,12 @@ export default function WardenDashboardPage() {
             setActiveOutpasses(active);
             setUpcomingOutpasses(upcoming);
             setExpiredOutpasses(expired);
+
+            if (activeTab === 'students') {
+                await fetchHostelStudents(hostelId);
+            } else if (activeTab === 'unassigned') {
+                await fetchUnassignedHostellers(hostelId);
+            }
         } catch (err: any) {
             setError(err.message || 'Failed to load data');
         } finally {
@@ -296,10 +331,14 @@ export default function WardenDashboardPage() {
         }
     }
 
-    async function fetchHostelStudents() {
+    async function fetchHostelStudents(hostelId: number) {
+        if (!hostelId) {
+            setHostelStudents([]);
+            return;
+        }
         setLoadingStudents(true);
         try {
-            const data = await api.getWardenStudents();
+            const data = await api.getWardenStudents(hostelId);
             setHostelStudents(data || []);
         } catch (err: any) {
             console.error('Failed to load hostel students:', err);
@@ -308,10 +347,14 @@ export default function WardenDashboardPage() {
         }
     }
 
-    async function fetchUnassignedHostellers() {
+    async function fetchUnassignedHostellers(hostelId: number) {
+        if (!hostelId) {
+            setUnassignedHostellers([]);
+            return;
+        }
         setLoadingUnassigned(true);
         try {
-            const data = await api.getWardenUnassignedHostellers();
+            const data = await api.getWardenUnassignedHostellers(hostelId);
             setUnassignedHostellers(data || []);
         } catch (err: any) {
             console.error('Failed to load unassigned hostellers:', err);
@@ -320,11 +363,22 @@ export default function WardenDashboardPage() {
         }
     }
 
+    async function handleHostelChange(hostelId: number) {
+        if (!hostelId || hostelId === selectedHostelId) return;
+        setSelectedHostelId(hostelId);
+        setAutoAssignPreview(null);
+        setShowAutoAssignModal(false);
+        setAutoAssignSummary(null);
+        setExpandedId(null);
+        await fetchData(hostelId);
+    }
+
     async function handleAutoAssign() {
+        if (!selectedHostelId) return;
         setAutoAssigning(true);
         setAutoAssignSummary(null);
         try {
-            const result: AutoAssignPreview = await api.previewAutoAssignHostelRooms();
+            const result: AutoAssignPreview = await api.previewAutoAssignHostelRooms(undefined, selectedHostelId);
             setAutoAssignPreview(result);
             setShowAutoAssignModal(true);
         } catch (err: any) {
@@ -335,19 +389,19 @@ export default function WardenDashboardPage() {
     }
 
     async function handleConfirmAutoAssign() {
-        if (!autoAssignPreview) return;
+        if (!autoAssignPreview || !selectedHostelId) return;
         setConfirmingAutoAssign(true);
         try {
             const assignments = autoAssignPreview.recommendations.map(rec => ({
                 student_id: rec.student_id,
                 room_id: rec.room_id,
             }));
-            const result: AutoAssignResult = await api.confirmAutoAssignHostelRooms(assignments);
+            const result: AutoAssignResult = await api.confirmAutoAssignHostelRooms(assignments, selectedHostelId);
             setLastAutoAssignResult(result);
             setAutoAssignSummary(`Assigned ${result.assigned_count} student(s), skipped ${result.skipped_count}.`);
             setShowAutoAssignModal(false);
             setAutoAssignPreview(null);
-            await fetchData();
+            await fetchData(selectedHostelId);
         } catch (err: any) {
             alert(err.message || 'Failed to confirm auto-assign');
         } finally {
@@ -359,7 +413,7 @@ export default function WardenDashboardPage() {
         setProcessingId(outpassId);
         try {
             await api.approveOutpass(outpassId);
-            await fetchData();
+            if (selectedHostelId) await fetchData(selectedHostelId);
         } catch (err: any) {
             alert(err.message || 'Failed to approve outpass');
         } finally {
@@ -377,7 +431,7 @@ export default function WardenDashboardPage() {
             await api.rejectOutpass(outpassId, rejectReason);
             setRejectModalId(null);
             setRejectReason('');
-            await fetchData();
+            if (selectedHostelId) await fetchData(selectedHostelId);
         } catch (err: any) {
             alert(err.message || 'Failed to reject outpass');
         } finally {
@@ -389,7 +443,7 @@ export default function WardenDashboardPage() {
         setCertProcessingId(certId);
         try {
             await api.approveCertificate(certId);
-            await fetchData();
+            if (selectedHostelId) await fetchData(selectedHostelId);
         } catch (err: any) {
             alert(err.message || 'Failed to approve certificate');
         } finally {
@@ -407,7 +461,7 @@ export default function WardenDashboardPage() {
             await api.rejectCertificate(certId, certRejectReason);
             setCertRejectModalId(null);
             setCertRejectReason('');
-            await fetchData();
+            if (selectedHostelId) await fetchData(selectedHostelId);
         } catch (err: any) {
             alert(err.message || 'Failed to reject certificate');
         } finally {
@@ -455,6 +509,22 @@ export default function WardenDashboardPage() {
                         <DoorOpen size={14} weight="duotone" />
                         {hostel.name} • Outpass & Certificate Management
                     </p>
+                </div>
+                <div className="min-w-[260px]">
+                    <label className="block text-[10px] font-mono uppercase tracking-widest text-slate-500 mb-2">
+                        Active Hostel ({hostels.length})
+                    </label>
+                    <select
+                        value={selectedHostelId ?? ''}
+                        onChange={(e) => void handleHostelChange(Number(e.target.value))}
+                        className="w-full bg-slate-900/70 border border-slate-700/60 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                    >
+                        {hostels.map((item) => (
+                            <option key={item.id} value={item.id}>
+                                {item.name}
+                            </option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
@@ -979,6 +1049,9 @@ export default function WardenDashboardPage() {
                                                     <p className="text-sm text-slate-400">
                                                         {cert.student_register_number} • {cert.student_department}
                                                     </p>
+                                                    <p className="text-xs text-indigo-300 mt-1">
+                                                        Hostel: {cert.hostel_name || hostel.name}
+                                                    </p>
                                                     <div className="mt-2 text-sm">
                                                         <p className="text-purple-400 font-medium">
                                                             {CERTIFICATE_TYPES[cert.certificate_type] || cert.certificate_type}
@@ -1142,8 +1215,11 @@ export default function WardenDashboardPage() {
                 <div>
                     <h2 className="text-lg font-chivo font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
                         <Users size={20} className="text-cyan-400" />
-                        Unassigned Hostellers (Eligible for This Hostel)
+                        Unassigned Hostellers
                     </h2>
+                    <p className="text-xs text-slate-500 mb-4">
+                        Showing hosteller students who were never assigned to any hostel room.
+                    </p>
 
                     {loadingUnassigned ? (
                         <div className="bg-slate-800/40 border border-slate-700/60 rounded-lg p-8 text-center">

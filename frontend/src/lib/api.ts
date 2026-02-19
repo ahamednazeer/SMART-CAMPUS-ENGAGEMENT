@@ -627,16 +627,23 @@ class ApiClient {
     }
 
     // Warden - Hostel Management
-    async getWardenHostel() {
-        return this.request('/warden/hostel');
+    async getWardenHostels() {
+        return this.request('/warden/hostels');
     }
 
-    async getWardenStudents() {
-        return this.request('/warden/students');
+    async getWardenHostel(hostelId?: number) {
+        const query = hostelId ? `?hostel_id=${hostelId}` : '';
+        return this.request(`/warden/hostel${query}`);
     }
 
-    async getWardenUnassignedHostellers() {
-        return this.request('/warden/hostel/unassigned-students');
+    async getWardenStudents(hostelId?: number) {
+        const query = hostelId ? `?hostel_id=${hostelId}` : '';
+        return this.request(`/warden/students${query}`);
+    }
+
+    async getWardenUnassignedHostellers(hostelId?: number) {
+        const query = hostelId ? `?hostel_id=${hostelId}` : '';
+        return this.request(`/warden/hostel/unassigned-students${query}`);
     }
 
     async previewAutoAssignHostelRooms(params?: {
@@ -647,8 +654,9 @@ class ApiClient {
         batch?: string;
         limit?: number;
         strategy?: 'fill' | 'spread';
-    }) {
+    }, hostelId?: number) {
         const searchParams = new URLSearchParams();
+        if (hostelId) searchParams.set('hostel_id', hostelId.toString());
         if (params?.department) searchParams.set('department', params.department);
         if (params?.study_year) searchParams.set('study_year', params.study_year.toString());
         if (params?.degree) searchParams.set('degree', params.degree);
@@ -662,15 +670,20 @@ class ApiClient {
         });
     }
 
-    async confirmAutoAssignHostelRooms(assignments: { student_id: number; room_id: number }[]) {
-        return this.request('/warden/hostel/auto-assign/confirm', {
+    async confirmAutoAssignHostelRooms(
+        assignments: { student_id: number; room_id: number }[],
+        hostelId?: number
+    ) {
+        const query = hostelId ? `?hostel_id=${hostelId}` : '';
+        return this.request(`/warden/hostel/auto-assign/confirm${query}`, {
             method: 'POST',
             body: JSON.stringify({ assignments }),
         });
     }
 
-    async getLatestAutoAssignResult() {
-        return this.request('/warden/hostel/auto-assign/latest');
+    async getLatestAutoAssignResult(hostelId?: number) {
+        const query = hostelId ? `?hostel_id=${hostelId}` : '';
+        return this.request(`/warden/hostel/auto-assign/latest${query}`);
     }
 
     async downloadHostelAssignments(format: 'excel' | 'pdf', params?: {
@@ -679,7 +692,7 @@ class ApiClient {
         degree?: string;
         gender?: string;
         batch?: string;
-    }) {
+    }, hostelId?: number) {
         const token = this.getToken();
         const headers: Record<string, string> = {};
         if (token) {
@@ -687,6 +700,7 @@ class ApiClient {
         }
         const searchParams = new URLSearchParams();
         searchParams.set('format', format);
+        if (hostelId) searchParams.set('hostel_id', hostelId.toString());
         if (params?.department) searchParams.set('department', params.department);
         if (params?.study_year) searchParams.set('study_year', params.study_year.toString());
         if (params?.degree) searchParams.set('degree', params.degree);
@@ -704,12 +718,23 @@ class ApiClient {
         return response.blob();
     }
 
-    async getPendingOutpasses(page: number = 1, pageSize: number = 20) {
-        return this.request(`/warden/outpass/pending?page=${page}&page_size=${pageSize}`);
+    async getPendingOutpasses(page: number = 1, pageSize: number = 20, hostelId?: number) {
+        const query = new URLSearchParams({
+            page: page.toString(),
+            page_size: pageSize.toString(),
+        });
+        if (hostelId) query.set('hostel_id', hostelId.toString());
+        return this.request(`/warden/outpass/pending?${query.toString()}`);
     }
 
-    async getAllHostelOutpasses(status?: string, page: number = 1, pageSize: number = 20) {
+    async getAllHostelOutpasses(
+        status?: string,
+        page: number = 1,
+        pageSize: number = 20,
+        hostelId?: number
+    ) {
         let url = `/warden/outpass/all?page=${page}&page_size=${pageSize}`;
+        if (hostelId) url += `&hostel_id=${hostelId}`;
         if (status) url += `&status=${status}`;
         return this.request(url);
     }
@@ -718,8 +743,10 @@ class ApiClient {
         return this.request(`/warden/outpass/student/${studentId}`);
     }
 
-    async getApprovedOutpasses(page: number = 1, pageSize: number = 100) {
-        return this.request(`/warden/outpass/all?status=APPROVED&page=${page}&page_size=${pageSize}`);
+    async getApprovedOutpasses(page: number = 1, pageSize: number = 100, hostelId?: number) {
+        let url = `/warden/outpass/all?status=APPROVED&page=${page}&page_size=${pageSize}`;
+        if (hostelId) url += `&hostel_id=${hostelId}`;
+        return this.request(url);
     }
 
     async approveOutpass(outpassId: number) {
@@ -801,6 +828,10 @@ class ApiClient {
         });
     }
 
+    async getAllHostelAssignments() {
+        return this.request('/admin/hostels/assignments/all');
+    }
+
     async getHostelStudents(hostelId: number) {
         return this.request(`/admin/hostels/${hostelId}/students`);
     }
@@ -842,13 +873,20 @@ class ApiClient {
     }
 
     // Warden - Get pending certificates
-    async getPendingCertificates() {
-        return this.request('/certificates/warden/pending');
+    async getPendingCertificates(hostelId?: number) {
+        const query = hostelId ? `?hostel_id=${hostelId}` : '';
+        return this.request(`/certificates/warden/pending${query}`);
     }
 
     // Warden - Get all hostel certificates
-    async getAllCertificates(status?: string, page: number = 1, pageSize: number = 20) {
+    async getAllCertificates(
+        status?: string,
+        page: number = 1,
+        pageSize: number = 20,
+        hostelId?: number
+    ) {
         let url = `/certificates/warden/all?page=${page}&page_size=${pageSize}`;
+        if (hostelId) url += `&hostel_id=${hostelId}`;
         if (status) url += `&status=${status}`;
         return this.request(url);
     }

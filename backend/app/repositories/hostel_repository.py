@@ -1,7 +1,9 @@
 """Repository for hostel data access."""
+from datetime import datetime, timezone
+
 from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.models.hostel import Hostel, HostelRoom, HostelAssignment, HostelAssignmentBatch
 from app.models.user import User, UserRole, StudentCategory
@@ -56,8 +58,9 @@ class HostelRepository:
         hostel = await self.get_hostel(hostel_id)
         if not hostel:
             return None
+
         for key, value in kwargs.items():
-            if hasattr(hostel, key) and value is not None:
+            if hasattr(hostel, key) and (value is not None or key == "warden_id"):
                 setattr(hostel, key, value)
         await self.db.commit()
         await self.db.refresh(hostel)
@@ -67,12 +70,19 @@ class HostelRepository:
         """Assign or remove warden from hostel."""
         return await self.update_hostel(hostel_id, warden_id=warden_id)
 
+    async def get_warden_hostels(self, warden_id: int) -> list[Hostel]:
+        """Get all active hostels managed by a warden."""
+        result = await self.db.execute(
+            select(Hostel)
+            .where(Hostel.warden_id == warden_id, Hostel.is_active == True)
+            .order_by(Hostel.updated_at.desc(), Hostel.id.desc())
+        )
+        return list(result.scalars().all())
+
     async def get_warden_hostel(self, warden_id: int) -> Hostel | None:
         """Get hostel managed by a warden."""
-        result = await self.db.execute(
-            select(Hostel).where(Hostel.warden_id == warden_id, Hostel.is_active == True)
-        )
-        return result.scalar_one_or_none()
+        hostels = await self.get_warden_hostels(warden_id)
+        return hostels[0] if hostels else None
 
     # ==================== ROOM CRUD ====================
 
@@ -146,17 +156,42 @@ class HostelRepository:
     async def create_assignment(
         self, student_id: int, hostel_id: int, room_id: int
     ) -> HostelAssignment:
-        """Assign student to a room."""
-        # Deactivate any existing assignment
-        await self.deactivate_student_assignment(student_id)
-        
+        """
+        Assign student to a room.
+
+        Note: `hostel_assignments.student_id` is globally unique in DB.
+        So if an old inactive row exists, reactivate/update that row instead of inserting a new one.
+        """
+        active = await self.get_student_assignment(student_id)
+        if active:
+            raise ValueError("Student already has an active hostel assignment")
+
+        result = await self.db.execute(
+            select(HostelAssignment).where(HostelAssignment.student_id == student_id)
+        )
+        existing_any = result.scalar_one_or_none()
+
+        if existing_any:
+            existing_any.hostel_id = hostel_id
+            existing_any.room_id = room_id
+            existing_any.is_active = True
+            existing_any.assigned_at = datetime.now(timezone.utc)
+            await self.db.commit()
+            await self.db.refresh(existing_any)
+            return existing_any
+
         assignment = HostelAssignment(
             student_id=student_id,
             hostel_id=hostel_id,
             room_id=room_id
         )
         self.db.add(assignment)
-        await self.db.commit()
+        try:
+            await self.db.commit()
+        except IntegrityError:
+            await self.db.rollback()
+            # Race-safe fallback for concurrent assignment requests.
+            raise ValueError("Student already has an active hostel assignment")
         await self.db.refresh(assignment)
         return assignment
 
@@ -182,6 +217,37 @@ class HostelRepository:
             .where(HostelAssignment.hostel_id == hostel_id, HostelAssignment.is_active == True)
         )
         return list(result.scalars().all())
+
+    async def get_hostel_assignments_with_details(
+        self, hostel_id: int
+    ) -> list[tuple[HostelAssignment, User, Hostel, HostelRoom]]:
+        """Get all active assignments in a hostel with joined details."""
+        result = await self.db.execute(
+            select(HostelAssignment, User, Hostel, HostelRoom)
+            .join(User, User.id == HostelAssignment.student_id)
+            .join(Hostel, Hostel.id == HostelAssignment.hostel_id)
+            .join(HostelRoom, HostelRoom.id == HostelAssignment.room_id)
+            .where(
+                HostelAssignment.hostel_id == hostel_id,
+                HostelAssignment.is_active == True,
+            )
+            .order_by(HostelRoom.room_number, User.last_name, User.first_name)
+        )
+        return list(result.all())
+
+    async def get_all_active_assignments_with_details(
+        self,
+    ) -> list[tuple[HostelAssignment, User, Hostel, HostelRoom]]:
+        """Get all active assignments with joined hostel, room, and student details."""
+        result = await self.db.execute(
+            select(HostelAssignment, User, Hostel, HostelRoom)
+            .join(User, User.id == HostelAssignment.student_id)
+            .join(Hostel, Hostel.id == HostelAssignment.hostel_id)
+            .join(HostelRoom, HostelRoom.id == HostelAssignment.room_id)
+            .where(HostelAssignment.is_active == True)
+            .order_by(Hostel.name, HostelRoom.room_number, User.last_name, User.first_name)
+        )
+        return list(result.all())
 
     async def deactivate_student_assignment(self, student_id: int) -> bool:
         """Deactivate student's current assignment."""
@@ -233,19 +299,25 @@ class HostelRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_unassigned_hosteller_students(self) -> list[User]:
-        """Get all active hosteller students without an active assignment."""
-        assignment_exists = select(HostelAssignment.id).where(
-            HostelAssignment.student_id == User.id,
-            HostelAssignment.is_active == True
+    async def get_unassigned_hosteller_students(self, hostel_id: int | None = None) -> list[User]:
+        """
+        Get active hosteller students who have never had any hostel assignment row.
+
+        `hostel_id` is accepted for caller compatibility but does not change behavior.
+        """
+        any_assignment_exists = select(HostelAssignment.id).where(
+            HostelAssignment.student_id == User.id
         ).exists()
+
+        query = select(User).where(
+            User.is_active == True,
+            User.student_category == StudentCategory.HOSTELLER,
+            User.role.in_([UserRole.STUDENT, UserRole.HOSTELLER]),
+            ~any_assignment_exists
+        )
+
         result = await self.db.execute(
-            select(User).where(
-                User.is_active == True,
-                User.student_category == StudentCategory.HOSTELLER,
-                User.role.in_([UserRole.STUDENT, UserRole.HOSTELLER]),
-                ~assignment_exists
-            ).order_by(User.department, User.study_year, User.degree, User.last_name)
+            query.order_by(User.department, User.study_year, User.degree, User.last_name)
         )
         return list(result.scalars().all())
 
